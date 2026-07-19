@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SRC 100 Day Challenge — Weekly Recap</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap">
+    <a class="nav-brand" href="index.html">
+      <span class="mark">SRC</span>
+      <span class="name">100 DAY CHALLENGE</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="index.html" data-page="overview">Overview</a></li>
+      <li><a href="teams.html" data-page="teams">Teams</a></li>
+      <li><a href="individuals.html" data-page="individuals">Individuals</a></li>
+      <li><a href="weekly.html" data-page="weekly">Weekly</a></li>
+    </ul>
+    <span class="sync-badge" id="syncBadge"></span>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow animate-fade-up">Weekly recap</p>
+    <h1 class="animate-fade-up" style="animation-delay:0.2s">Week by week</h1>
+    <p class="sub animate-fade-up" style="animation-delay:0.3s">Top teams and sport leaders for each week of the challenge.</p>
+
+    <div class="week-nav" id="weekNav"></div>
+  </div>
+</header>
+
+<main class="section">
+  <div class="wrap" id="weeklyContent">
+    <div class="empty-state"><div class="big">Loading…</div></div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>SRC 100 Day Challenge — weekly recap</span>
+    <span id="footSync"></span>
+  </div>
+</footer>
+
+<!-- Loading toast -->
+<div class="loading-toast" id="loadingToast">
+  <div class="loading-spinner"></div>
+  <span>Fetching latest data…</span>
+</div>
+
+<script src="dashboard.js"></script>
+<script>
+markActiveNav('weekly');
+
+const EVENT_START = '2026-07-20'; // Monday
+
+fetchDashboard().then(data => {
+  renderSyncBadge(document.getElementById('syncBadge'), data.generated_at);
+  document.getElementById('footSync').textContent = 'Last synced: ' + new Date(data.generated_at).toLocaleString('en-IN');
+  renderWeekly(data);
+}).catch(err => {
+  document.getElementById('weeklyContent').innerHTML =
+    '<div class="empty-state"><div class="big">Could not load data</div>' + err.message + '</div>';
+});
+
+window.addEventListener('dashboardFreshData', e => renderWeekly(e.detail));
+
+function getWeeks() {
+  const start = new Date(EVENT_START + 'T00:00:00+05:30');
+  const today = new Date();
+  const weeks = [];
+  let weekStart = new Date(start);
+  let weekNum = 1;
+
+  while (weekStart <= today && weekNum <= 15) {
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const isCurrentWeek = today >= weekStart && today <= weekEnd;
+    weeks.push({
+      num: weekNum,
+      start: weekStart.toISOString().slice(0, 10),
+      end: weekEnd.toISOString().slice(0, 10),
+      startLabel: weekStart.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+      endLabel: weekEnd.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+      isCurrent: isCurrentWeek
+    });
+    weekStart = new Date(weekEnd);
+    weekStart.setDate(weekStart.getDate() + 1);
+    weekNum++;
+  }
+  return weeks;
+}
+
+function renderWeekly(data) {
+  const dailyBreakdown = data.daily_breakdown || [];
+  const weeks = getWeeks();
+
+  if (weeks.length === 0) {
+    document.getElementById('weeklyContent').innerHTML =
+      '<div class="empty-state"><div class="big">Challenge hasn\'t started yet</div>Week 1 begins on Jul 20.</div>';
+    document.getElementById('weekNav').innerHTML = '';
+    return;
+  }
+
+  // Week nav buttons
+  document.getElementById('weekNav').innerHTML = weeks.map(w => `
+    <button class="week-btn ${w.isCurrent ? 'active' : ''}" data-week="${w.num}">
+      Week ${w.num}${w.isCurrent ? ' ⟵' : ''}
+    </button>
+  `).join('');
+
+  // Render all weeks
+  let html = '';
+  weeks.slice().reverse().forEach(week => {
+    const weekData = dailyBreakdown.filter(r => r.date >= week.start && r.date <= week.end);
+    html += renderWeekCard(week, weekData, data);
+  });
+
+  document.getElementById('weeklyContent').innerHTML = html;
+
+  // Week nav click → scroll to that section
+  document.getElementById('weekNav').addEventListener('click', e => {
+    const btn = e.target.closest('.week-btn');
+    if (!btn) return;
+    const target = document.getElementById('week-' + btn.dataset.week);
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+}
+
+function renderWeekCard(week, weekData, fullData) {
+  const uniqueParticipants = new Set(weekData.map(r => r.name)).size;
+  const totalEntries = weekData.length;
+  const totalPoints = weekData.reduce((s, r) => s + r.points, 0);
+
+  // Top team
+  const teamPoints = {};
+  weekData.forEach(r => {
+    teamPoints[r.team] = (teamPoints[r.team] || 0) + r.points;
+  });
+  const topTeam = Object.entries(teamPoints).sort((a, b) => b[1] - a[1])[0];
+
+  // Most popular sport
+  const sportEntries = {};
+  weekData.forEach(r => {
+    if (r.sport) sportEntries[r.sport] = (sportEntries[r.sport] || 0) + 1;
+  });
+  const topSport = Object.entries(sportEntries).sort((a, b) => b[1] - a[1])[0];
+
+  // Top 3 per sport
+  const sportParticipants = {}; // sport -> { name -> points }
+  weekData.forEach(r => {
+    if (!r.sport) return;
+    if (!sportParticipants[r.sport]) sportParticipants[r.sport] = {};
+    sportParticipants[r.sport][r.name] = (sportParticipants[r.sport][r.name] || 0) + r.points;
+  });
+
+  const sportsRanked = Object.keys(sportParticipants).sort((a, b) => {
+    const totalA = Object.values(sportParticipants[a]).reduce((s, v) => s + v, 0);
+    const totalB = Object.values(sportParticipants[b]).reduce((s, v) => s + v, 0);
+    return totalB - totalA;
+  });
+
+  // Week MVP
+  const personPoints = {};
+  weekData.forEach(r => { personPoints[r.name] = (personPoints[r.name] || 0) + r.points; });
+  const mvp = Object.entries(personPoints).sort((a, b) => b[1] - a[1])[0];
+
+  const statusBadge = week.isCurrent
+    ? '<span class="week-status in-progress">In progress</span>'
+    : '<span class="week-status completed">Completed</span>';
+
+  if (weekData.length === 0) {
+    return `
+      <div class="week-card" id="week-${week.num}">
+        <div class="week-header">
+          <h2>Week ${week.num} <span class="week-dates">${week.startLabel} – ${week.endLabel}</span></h2>
+          ${statusBadge}
+        </div>
+        <div class="empty-state" style="padding:20px"><div class="big">No activity yet</div>Data will appear once participants log activities.</div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="week-card" id="week-${week.num}">
+      <div class="week-header">
+        <h2>Week ${week.num} <span class="week-dates">${week.startLabel} – ${week.endLabel}</span></h2>
+        ${statusBadge}
+      </div>
+
+      <div class="week-stats-row">
+        <div class="week-stat"><div class="week-stat-num">${formatNumber(totalPoints)}</div><div class="week-stat-label">Points</div></div>
+        <div class="week-stat"><div class="week-stat-num">${uniqueParticipants}</div><div class="week-stat-label">Participants</div></div>
+        <div class="week-stat"><div class="week-stat-num">${totalEntries}</div><div class="week-stat-label">Entries</div></div>
+        <div class="week-stat"><div class="week-stat-num">${topSport ? topSport[0] : '—'}</div><div class="week-stat-label">Top sport</div></div>
+      </div>
+
+      <div class="week-highlights">
+        ${topTeam ? `
+        <div class="week-highlight-card">
+          <div class="week-highlight-icon">🏆</div>
+          <div>
+            <div class="week-highlight-title">Top Team</div>
+            <div class="week-highlight-value">${topTeam[0]}</div>
+            <div class="week-highlight-sub">${formatNumber(topTeam[1])} pts this week</div>
+          </div>
+        </div>
+        ` : ''}
+        ${mvp ? `
+        <div class="week-highlight-card">
+          <div class="week-highlight-icon">⭐</div>
+          <div>
+            <div class="week-highlight-title">Week MVP</div>
+            <div class="week-highlight-value">${mvp[0]}</div>
+            <div class="week-highlight-sub">${formatNumber(mvp[1])} pts this week</div>
+          </div>
+        </div>
+        ` : ''}
+      </div>
+
+      <div class="week-sports-section">
+        <h3>Top 3 per sport</h3>
+        <div class="week-sports-grid">
+          ${sportsRanked.map(sport => {
+            const top3 = Object.entries(sportParticipants[sport])
+              .sort((a, b) => b[1] - a[1])
+              .slice(0, 3);
+            const medals = ['🥇', '🥈', '🥉'];
+            return `
+              <div class="week-sport-card">
+                <h4>${sport}</h4>
+                ${top3.map((entry, i) => `
+                  <div class="week-sport-row">
+                    <span class="medal">${medals[i]}</span>
+                    <span class="name">${entry[0]}</span>
+                    <span class="pts">${formatNumber(entry[1])} pts</span>
+                  </div>
+                `).join('')}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+}
+</script>
+</body>
+</html>

@@ -20,6 +20,7 @@
       <li><a href="index.html" data-page="overview">Overview</a></li>
       <li><a href="teams.html" data-page="teams">Teams</a></li>
       <li><a href="individuals.html" data-page="individuals">Individuals</a></li>
+      <li><a href="weekly.html" data-page="weekly">Weekly</a></li>
     </ul>
     <span class="sync-badge" id="syncBadge"></span>
   </div>
@@ -171,6 +172,7 @@
   <div class="wrap">
     <span>SRC 100 Day Challenge — running, swimming, walking, field sports & yoga</span>
     <span id="footSync"></span>
+    <span class="view-counter" id="viewCounter"></span>
   </div>
 </footer>
 
@@ -189,6 +191,11 @@ let trendChart, donutChart, raceChart;
 function renderOverview(data) {
   renderSyncBadge(document.getElementById('syncBadge'), data.generated_at);
   document.getElementById('footSync').textContent = 'Last synced: ' + new Date(data.generated_at).toLocaleString('en-IN');
+
+  // Show page views
+  if (data.page_views) {
+    document.getElementById('viewCounter').textContent = '👁 ' + formatNumber(data.page_views) + ' views';
+  }
 
   const { event, summary, teams, participants } = data;
   const dailyBreakdown = data.daily_breakdown || [];
