@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SRC 100 Day Challenge — Team Module</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap">
+    <a class="nav-brand" href="index.html">
+      <span class="mark">SRC</span>
+      <span class="name">100 DAY CHALLENGE</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="index.html" data-page="overview">Overview</a></li>
+      <li><a href="teams.html" data-page="teams">Teams</a></li>
+      <li><a href="individuals.html" data-page="individuals">Individuals</a></li>
+    </ul>
+    <span class="sync-badge" id="syncBadge"></span>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Team module</p>
+    <h1>Lane by lane</h1>
+    <p class="sub">Every team's total points, side by side — like lanes on a track.</p>
+    <div id="battleBars"></div>
+  </div>
+</header>
+
+<main class="section">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Team leaderboard</h2>
+      <span class="hint">click a team to see members</span>
+    </div>
+    <div class="team-grid" id="teamGrid"></div>
+
+    <div class="team-detail panel" id="teamDetail" style="display:none">
+      <div class="section-head">
+        <h2 id="detailTitle">Team</h2>
+        <span class="hint" id="detailMeta"></span>
+      </div>
+      <table class="member-table">
+        <thead>
+          <tr><th>Rank</th><th>Name</th><th>Activity pts</th><th>Bonus pts</th><th>Total</th><th>Streak</th></tr>
+        </thead>
+        <tbody id="detailBody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>SRC 100 Day Challenge — team module</span>
+    <span id="footSync"></span>
+  </div>
+</footer>
+
+<script src="assets/dashboard.js"></script>
+<script>
+markActiveNav('teams');
+
+fetchDashboard().then(data => {
+  renderSyncBadge(document.getElementById('syncBadge'), data.generated_at);
+  document.getElementById('footSync').textContent = 'Last synced: ' + new Date(data.generated_at).toLocaleString('en-IN');
+
+  const { teams, participants } = data;
+  const rankedTeams = [...teams].sort((a, b) => b.total_points - a.total_points);
+  const maxPts = Math.max(...rankedTeams.map(t => t.total_points), 1);
+
+  const battleWrap = document.getElementById('battleBars');
+  battleWrap.innerHTML = rankedTeams.map(t => `
+    <div style="margin-bottom:16px">
+      <div class="lane-caption" style="margin-top:0;margin-bottom:6px">
+        <span style="font-weight:700;color:var(--ink)">${t.name}</span>
+        <span>${formatNumber(t.total_points)} pts</span>
+      </div>
+      <div class="lane-bar mini" id="battle-${cssId(t.name)}"><div class="lane-fill" style="background:${teamColor(t.name)}"></div></div>
+    </div>
+  `).join('');
+  rankedTeams.forEach(t => {
+    fillLaneBar(document.getElementById('battle-' + cssId(t.name)), (t.total_points / maxPts) * 100);
+  });
+
+  const teamGrid = document.getElementById('teamGrid');
+  teamGrid.innerHTML = rankedTeams.map(t => `
+    <div class="team-card" style="--team-color:${teamColor(t.name)}" data-team="${t.name}">
+      <h3>${t.name}</h3>
+      <div class="meta">${t.members} members</div>
+      <div class="total">${formatNumber(t.total_points)} pts</div>
+      <div class="breakdown">
+        <span><span class="tag" style="background:var(--turf)"></span>${formatNumber(t.activity_points)} activity</span>
+        <span><span class="tag" style="background:var(--flag)"></span>${formatNumber(t.bonus_points)} bonus</span>
+      </div>
+    </div>
+  `).join('');
+
+  teamGrid.querySelectorAll('.team-card').forEach(card => {
+    card.addEventListener('click', () => showTeamDetail(card.dataset.team, participants));
+  });
+
+  if (rankedTeams.length) showTeamDetail(rankedTeams[0].name, participants);
+
+}).catch(err => {
+  document.getElementById('battleBars').innerHTML =
+    '<div class="empty-state"><div class="big">Could not load data</div>' + err.message + '</div>';
+});
+
+function cssId(name) { return name.toLowerCase().replace(/[^a-z0-9]+/g, '-'); }
+
+function showTeamDetail(teamName, participants) {
+  const detail = document.getElementById('teamDetail');
+  const members = participants.filter(p => p.team === teamName).sort((a, b) => b.total_points - a.total_points);
+  document.getElementById('detailTitle').textContent = teamName;
+  document.getElementById('detailMeta').textContent = members.length + ' members';
+  document.getElementById('detailBody').innerHTML = members.map((p, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${p.name}</td>
+      <td>${formatNumber(p.activity_points)}</td>
+      <td>${formatNumber(p.bonus_points)}</td>
+      <td><strong>${formatNumber(p.total_points)}</strong></td>
+      <td>${p.streak || 0}d</td>
+    </tr>
+  `).join('');
+  detail.style.display = 'block';
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+{
+  "generated_at": "2026-07-19T10:15:00+05:30",
+  "event": {
+    "name": "SRC 100 Day Challenge",
+    "start_date": "2026-06-08",
+    "total_days": 100,
+    "current_day": 42
+  },
+  "summary": {
+    "total_participants": 6,
+    "total_points": 13480,
+    "active_today": 4,
+    "latest_updates": [
+      { "text": "Priya N. hit a 30-day streak — +50 pts", "time": "2026-07-19T08:40:00+05:30" },
+      { "text": "Team Falcons won this week's team bonus — +100 pts", "time": "2026-07-18T23:00:00+05:30" },
+      { "text": "Rahul K. logged 5 different sports this week — Variety Bonus +20 pts", "time": "2026-07-18T19:12:00+05:30" },
+      { "text": "Meera S. joined the challenge", "time": "2026-07-17T09:05:00+05:30" }
+    ]
+  },
+  "teams": [
+    { "name": "Team Falcons", "members": 3, "activity_points": 4200, "bonus_points": 380, "total_points": 4580 },
+    { "name": "Team Cheetahs", "members": 3, "activity_points": 3900, "bonus_points": 300, "total_points": 4200 }
+  ],
+  "participants": [
+    { "name": "Priya N.", "team": "Team Falcons", "activity_points": 1520, "bonus_points": 180, "total_points": 1700, "streak": 30, "sports_this_week": ["Running", "Yoga", "Swimming"], "active_today": true },
+    { "name": "Rahul K.", "team": "Team Falcons", "activity_points": 1390, "bonus_points": 120, "total_points": 1510, "streak": 12, "sports_this_week": ["Running", "Cycling", "Football / Soccer", "Yoga", "Badminton"], "active_today": true },
+    { "name": "Meera S.", "team": "Team Falcons", "activity_points": 1290, "bonus_points": 80, "total_points": 1370, "streak": 4, "sports_this_week": ["Walking", "Yoga"], "active_today": false },
+    { "name": "Arjun V.", "team": "Team Cheetahs", "activity_points": 1480, "bonus_points": 150, "total_points": 1630, "streak": 21, "sports_this_week": ["Running", "Swimming"], "active_today": true },
+    { "name": "Sana T.", "team": "Team Cheetahs", "activity_points": 1260, "bonus_points": 100, "total_points": 1360, "streak": 8, "sports_this_week": ["Walking", "Tennis", "Yoga"], "active_today": true },
+    { "name": "Devika R.", "team": "Team Cheetahs", "activity_points": 1160, "bonus_points": 50, "total_points": 1210, "streak": 2, "sports_this_week": ["Yoga"], "active_today": false }
+  ]
+}

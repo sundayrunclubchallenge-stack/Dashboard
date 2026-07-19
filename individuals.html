@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SRC 100 Day Challenge — Individual Module</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap">
+    <a class="nav-brand" href="index.html">
+      <span class="mark">SRC</span>
+      <span class="name">100 DAY CHALLENGE</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="index.html" data-page="overview">Overview</a></li>
+      <li><a href="teams.html" data-page="teams">Teams</a></li>
+      <li><a href="individuals.html" data-page="individuals">Individuals</a></li>
+    </ul>
+    <span class="sync-badge" id="syncBadge"></span>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Individual module</p>
+    <h1>Find your bib</h1>
+    <p class="sub">Search a name to pull up personal points, streak and progress.</p>
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="Type a participant name…" autocomplete="off">
+      <div class="search-results" id="searchResults"></div>
+    </div>
+  </div>
+</header>
+
+<main class="section">
+  <div class="wrap">
+    <div id="profilePanel"></div>
+  </div>
+
+  <div class="wrap" style="margin-top:16px">
+    <div class="section-head">
+      <h2>Full leaderboard</h2>
+    </div>
+    <div class="lb-controls" id="lbControls">
+      <button data-sort="total" class="active">Total points</button>
+      <button data-sort="activity">Activity points</button>
+      <button data-sort="bonus">Bonus points</button>
+      <button data-sort="streak">Streak</button>
+    </div>
+    <div class="panel">
+      <table class="member-table" style="width:100%">
+        <thead>
+          <tr><th>Rank</th><th>Name</th><th>Team</th><th>Activity</th><th>Bonus</th><th>Total</th><th>Streak</th></tr>
+        </thead>
+        <tbody id="lbBody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>SRC 100 Day Challenge — individual module</span>
+    <span id="footSync"></span>
+  </div>
+</footer>
+
+<script src="assets/dashboard.js"></script>
+<script>
+markActiveNav('individuals');
+
+let ALL_PARTICIPANTS = [];
+let EVENT_INFO = null;
+let currentSort = 'total';
+
+fetchDashboard().then(data => {
+  renderSyncBadge(document.getElementById('syncBadge'), data.generated_at);
+  document.getElementById('footSync').textContent = 'Last synced: ' + new Date(data.generated_at).toLocaleString('en-IN');
+  ALL_PARTICIPANTS = data.participants;
+  EVENT_INFO = data.event;
+
+  renderLeaderboard();
+
+  const params = new URLSearchParams(window.location.search);
+  const preselect = params.get('name');
+  if (preselect) {
+    const match = ALL_PARTICIPANTS.find(p => p.name.toLowerCase() === preselect.toLowerCase());
+    if (match) renderProfile(match);
+  } else {
+    document.getElementById('profilePanel').innerHTML = emptyProfileHtml();
+  }
+}).catch(err => {
+  document.getElementById('profilePanel').innerHTML =
+    '<div class="empty-state"><div class="big">Could not load data</div>' + err.message + '</div>';
+});
+
+const searchInput = document.getElementById('searchInput');
+const searchResults = document.getElementById('searchResults');
+
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.trim().toLowerCase();
+  if (!q) { searchResults.classList.remove('open'); return; }
+  const matches = ALL_PARTICIPANTS.filter(p => p.name.toLowerCase().includes(q)).slice(0, 8);
+  if (!matches.length) { searchResults.classList.remove('open'); return; }
+  searchResults.innerHTML = matches.map(p => `
+    <div class="opt" data-name="${p.name}">
+      <span>${p.name}</span>
+      <span class="t">${p.team}</span>
+    </div>
+  `).join('');
+  searchResults.classList.add('open');
+});
+
+searchResults.addEventListener('click', (e) => {
+  const opt = e.target.closest('.opt');
+  if (!opt) return;
+  const match = ALL_PARTICIPANTS.find(p => p.name === opt.dataset.name);
+  if (match) {
+    renderProfile(match);
+    searchInput.value = match.name;
+    searchResults.classList.remove('open');
+  }
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.search-box')) searchResults.classList.remove('open');
+});
+
+function emptyProfileHtml() {
+  return '<div class="panel empty-state"><div class="big">No one selected yet</div>Search a name above, or pick a row from the leaderboard below.</div>';
+}
+
+function renderProfile(p) {
+  const color = teamColor(p.team);
+  const progressPct = EVENT_INFO ? Math.round((p.streak / EVENT_INFO.total_days) * 100) : 0;
+
+  const allSports = ["Running","Cycling","Walking","Swimming","Yoga","Football / Soccer","Badminton","Tennis","Basketball","Hiking"];
+  const active = new Set(p.sports_this_week || []);
+
+  document.getElementById('profilePanel').innerHTML = `
+    <div class="panel">
+      <div class="profile-head">
+        <div class="bib">${p.name.charAt(0)}</div>
+        <div>
+          <div class="name">${p.name}</div>
+          <span class="team-chip" style="background:${color}">${p.team}</span>
+        </div>
+      </div>
+
+      <div class="tile-grid">
+        <div class="tile"><div class="num" style="color:var(--turf-dark)">${formatNumber(p.activity_points)}</div><div class="label">Activity points</div></div>
+        <div class="tile"><div class="num" style="color:var(--flag-dark)">${formatNumber(p.bonus_points)}</div><div class="label">Bonus points</div></div>
+        <div class="tile"><div class="num" style="color:var(--coral-dark)">${formatNumber(p.total_points)}</div><div class="label">Total points</div></div>
+      </div>
+
+      <div class="section-head" style="margin-bottom:8px"><h2 style="font-size:18px">Current streak</h2></div>
+      <div class="streak-flame">
+        ${flameSvg(p.streak)}
+        <span class="days">${p.streak || 0} day${p.streak === 1 ? '' : 's'}</span>
+      </div>
+
+      <div class="section-head" style="margin:20px 0 8px"><h2 style="font-size:18px">100-day progress</h2></div>
+      <div class="lane-bar" id="profileLane"><div class="lane-fill"></div></div>
+
+      <div class="section-head" style="margin:20px 0 4px"><h2 style="font-size:18px">This week's sports</h2></div>
+      <div class="chip-row">
+        ${allSports.map(s => `<span class="sport-chip ${active.has(s) ? 'active' : ''}">${s}</span>`).join('')}
+      </div>
+    </div>
+  `;
+  fillLaneBar(document.getElementById('profileLane'), progressPct);
+}
+
+function flameSvg(streak) {
+  const intensity = Math.min(1, (streak || 0) / 100);
+  const color = intensity > 0.6 ? 'var(--coral)' : intensity > 0.25 ? 'var(--flag)' : 'var(--ink-faint)';
+  return `<svg viewBox="0 0 24 24" fill="${color}"><path d="M12 2c1 3-2 4-2 7a3 3 0 0 0 6 0c0-1-.5-2-.5-2 2 1 3 3.5 3 5.5a6.5 6.5 0 0 1-13 0C5.5 8 9 6 12 2z"/></svg>`;
+}
+
+function renderLeaderboard() {
+  const tbody = document.getElementById('lbBody');
+  const sortKeyMap = { total: 'total_points', activity: 'activity_points', bonus: 'bonus_points', streak: 'streak' };
+  const key = sortKeyMap[currentSort];
+  const sorted = [...ALL_PARTICIPANTS].sort((a, b) => (b[key] || 0) - (a[key] || 0));
+
+  tbody.innerHTML = sorted.length ? sorted.map((p, i) => `
+    <tr style="cursor:pointer" data-name="${p.name}">
+      <td>${i + 1}</td>
+      <td>${p.name}</td>
+      <td>${p.team}</td>
+      <td>${formatNumber(p.activity_points)}</td>
+      <td>${formatNumber(p.bonus_points)}</td>
+      <td><strong>${formatNumber(p.total_points)}</strong></td>
+      <td>${p.streak || 0}d</td>
+    </tr>
+  `).join('') : `<tr><td colspan="7" class="empty-state">No participants yet</td></tr>`;
+
+  tbody.querySelectorAll('tr[data-name]').forEach(row => {
+    row.addEventListener('click', () => {
+      const p = ALL_PARTICIPANTS.find(x => x.name === row.dataset.name);
+      if (p) {
+        renderProfile(p);
+        window.scrollTo({ top: 0, behavior: REDUCED_MOTION ? 'auto' : 'smooth' });
+      }
+    });
+  });
+}
+
+document.getElementById('lbControls').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  document.querySelectorAll('#lbControls button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentSort = btn.dataset.sort;
+  renderLeaderboard();
+});
+</script>
+</body>
+</html>
