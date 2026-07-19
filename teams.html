@@ -206,8 +206,8 @@ function renderTeamsView(data, filterDate) {
   battleWrap.innerHTML = rankedTeams.map(t => `
     <div style="margin-bottom:16px">
       <div class="lane-caption" style="margin-top:0;margin-bottom:6px">
-        <span style="font-weight:700;color:var(--ink)">${t.name}</span>
-        <span>${formatNumber(t.total_points)} pts</span>
+        <span style="font-weight:700;color:#fff">${t.name}</span>
+        <span style="color:rgba(255,255,255,0.7)">${formatNumber(t.total_points)} pts</span>
       </div>
       <div class="lane-bar mini" id="battle-${cssId(t.name)}"><div class="lane-fill" style="background:${teamColor(t.name)}"></div></div>
     </div>
