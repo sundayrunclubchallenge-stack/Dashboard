@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SRC 100 Day Challenge — Team Module</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap">
+    <a class="nav-brand" href="index.html">
+      <span class="mark">SRC</span>
+      <span class="name">100 DAY CHALLENGE</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="index.html" data-page="overview">Overview</a></li>
+      <li><a href="teams.html" data-page="teams">Teams</a></li>
+      <li><a href="individuals.html" data-page="individuals">Individuals</a></li>
+    </ul>
+    <span class="sync-badge" id="syncBadge"></span>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <p class="eyebrow">Team module</p>
+    <h1>Lane by lane</h1>
+    <p class="sub">Every team's total points, side by side — like lanes on a track.</p>
+    <div id="battleBars"></div>
+  </div>
+</header>
+
+<main class="section">
+  <div class="wrap">
+    <div class="section-head">
+      <h2>Team leaderboard</h2>
+      <div class="date-filter">
+        <button class="filter-btn active" id="btnAllTime" data-filter="all">All time</button>
+        <input type="date" class="filter-date" id="filterDate" title="Pick a specific date">
+      </div>
+    </div>
+    <div class="team-grid" id="teamGrid"></div>
+  </div>
+
+  <!-- Team detail panel -->
+  <div class="wrap" style="margin-top:24px">
+    <div class="team-detail panel" id="teamDetail" style="display:none">
+      <div class="section-head">
+        <h2 id="detailTitle">Team</h2>
+        <span class="hint" id="detailMeta"></span>
+      </div>
+
+      <!-- Participation rate + Team sport donut -->
+      <div class="team-insights">
+        <div class="team-insight-card">
+          <div class="section-head" style="margin-bottom:8px"><h2 style="font-size:16px">Participation rate</h2></div>
+          <div class="engagement-ring-wrap" style="padding:10px 0">
+            <div class="engagement-ring" style="width:100px;height:100px">
+              <svg viewBox="0 0 120 120">
+                <circle class="ring-bg" cx="60" cy="60" r="52"/>
+                <circle class="ring-fill" cx="60" cy="60" r="52" id="teamRingFill"/>
+              </svg>
+              <div class="ring-label">
+                <div class="ring-num" id="teamParticipateNum" style="font-size:28px">0%</div>
+              </div>
+            </div>
+            <div class="engagement-meta" id="teamParticipateMeta">active this week</div>
+          </div>
+        </div>
+        <div class="team-insight-card">
+          <div class="section-head" style="margin-bottom:8px"><h2 style="font-size:16px">Sport distribution</h2></div>
+          <div class="chart-wrap" style="height:180px"><canvas id="teamSportDonut"></canvas></div>
+        </div>
+        <div class="team-insight-card">
+          <div class="section-head" style="margin-bottom:8px"><h2 style="font-size:16px">Weekly momentum</h2></div>
+          <div class="chart-wrap" style="height:180px"><canvas id="teamMomentumChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Member contribution chart -->
+      <div class="section-head" style="margin:20px 0 8px"><h2 style="font-size:16px">Member contribution</h2></div>
+      <div class="chart-wrap" style="height:200px"><canvas id="memberContribChart"></canvas></div>
+
+      <!-- Member table -->
+      <div class="section-head" style="margin:24px 0 8px"><h2 style="font-size:16px">Members</h2></div>
+      <table class="member-table">
+        <thead>
+          <tr><th>Rank</th><th>Name</th><th>Activity pts</th><th>Bonus pts</th><th>Total</th><th>Streak</th></tr>
+        </thead>
+        <tbody id="detailBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Head-to-head comparison -->
+  <div class="wrap" style="margin-top:24px">
+    <div class="panel">
+      <div class="section-head">
+        <h2>Head-to-head</h2>
+        <span class="hint">pick two teams to compare</span>
+      </div>
+      <div class="h2h-selectors">
+        <select id="h2hTeam1" class="h2h-select"><option value="">Team 1</option></select>
+        <span class="h2h-vs">VS</span>
+        <select id="h2hTeam2" class="h2h-select"><option value="">Team 2</option></select>
+      </div>
+      <div id="h2hResult"></div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>SRC 100 Day Challenge — team module</span>
+    <span id="footSync"></span>
+  </div>
+</footer>
+
+<!-- Loading toast -->
+<div class="loading-toast" id="loadingToast">
+  <div class="loading-spinner"></div>
+  <span>Fetching latest data…</span>
+</div>
+
+<script src="dashboard.js"></script>
+<script>
+markActiveNav('teams');
+
+let _fullData = null;
+let teamSportChart = null;
+let teamMomentumChart = null;
+let memberContribChart = null;
+
+fetchDashboard().then(data => {
+  _fullData = data;
+  renderSyncBadge(document.getElementById('syncBadge'), data.generated_at);
+  document.getElementById('footSync').textContent = 'Last synced: ' + new Date(data.generated_at).toLocaleString('en-IN');
+
+  renderTeamsView(data, null);
+  setupDateFilter();
+  setupH2H(data);
+
+}).catch(err => {
+  document.getElementById('battleBars').innerHTML =
+    '<div class="empty-state"><div class="big">Could not load data</div>' + err.message + '</div>';
+});
+
+window.addEventListener('dashboardFreshData', e => {
+  _fullData = e.detail;
+  const filterDate = document.getElementById('filterDate').value || null;
+  renderTeamsView(_fullData, filterDate);
+  setupH2H(_fullData);
+});
+
+function setupDateFilter() {
+  const btnAll = document.getElementById('btnAllTime');
+  const datePicker = document.getElementById('filterDate');
+
+  btnAll.addEventListener('click', () => {
+    datePicker.value = '';
+    btnAll.classList.add('active');
+    renderTeamsView(_fullData, null);
+  });
+
+  datePicker.addEventListener('change', () => {
+    const val = datePicker.value;
+    if (val) {
+      btnAll.classList.remove('active');
+      renderTeamsView(_fullData, val);
+    }
+  });
+}
+
+function renderTeamsView(data, filterDate) {
+  let { teams, participants } = data;
+  const dailyBreakdown = data.daily_breakdown || [];
+
+  if (filterDate) {
+    const filtered = dailyBreakdown.filter(r => r.date === filterDate);
+    const pMap = {};
+    filtered.forEach(r => {
+      if (!pMap[r.name]) pMap[r.name] = { name: r.name, team: r.team, activity_points: 0, bonus_points: 0, total_points: 0, streak: 0 };
+      pMap[r.name].activity_points += r.points;
+      pMap[r.name].total_points += r.points;
+    });
+    participants = Object.values(pMap);
+
+    const tMap = {};
+    participants.forEach(p => {
+      if (!tMap[p.team]) tMap[p.team] = { name: p.team, members: 0, activity_points: 0, bonus_points: 0, total_points: 0 };
+      tMap[p.team].members++;
+      tMap[p.team].activity_points += p.activity_points;
+      tMap[p.team].total_points += p.total_points;
+    });
+    teams = Object.values(tMap);
+  }
+
+  const rankedTeams = [...teams].sort((a, b) => b.total_points - a.total_points);
+  const maxPts = Math.max(...rankedTeams.map(t => t.total_points), 1);
+
+  const battleWrap = document.getElementById('battleBars');
+  battleWrap.innerHTML = rankedTeams.map(t => `
+    <div style="margin-bottom:16px">
+      <div class="lane-caption" style="margin-top:0;margin-bottom:6px">
+        <span style="font-weight:700;color:var(--ink)">${t.name}</span>
+        <span>${formatNumber(t.total_points)} pts</span>
+      </div>
+      <div class="lane-bar mini" id="battle-${cssId(t.name)}"><div class="lane-fill" style="background:${teamColor(t.name)}"></div></div>
+    </div>
+  `).join('');
+  rankedTeams.forEach(t => {
+    fillLaneBar(document.getElementById('battle-' + cssId(t.name)), (t.total_points / maxPts) * 100);
+  });
+
+  const teamGrid = document.getElementById('teamGrid');
+  teamGrid.innerHTML = rankedTeams.map(t => `
+    <div class="team-card" style="--team-color:${teamColor(t.name)}" data-team="${t.name}">
+      <h3>${t.name}</h3>
+      <div class="meta">${t.members} members</div>
+      <div class="total">${formatNumber(t.total_points)} pts</div>
+      <div class="breakdown">
+        <span><span class="tag" style="background:var(--turf)"></span>${formatNumber(t.activity_points)} activity</span>
+        <span><span class="tag" style="background:var(--flag)"></span>${formatNumber(t.bonus_points)} bonus</span>
+      </div>
+    </div>
+  `).join('');
+
+  teamGrid.querySelectorAll('.team-card').forEach(card => {
+    card.addEventListener('click', () => showTeamDetail(card.dataset.team, participants, data));
+  });
+
+  if (rankedTeams.length) showTeamDetail(rankedTeams[0].name, participants, data);
+}
+
+function cssId(name) { return name.toLowerCase().replace(/[^a-z0-9]+/g, '-'); }
+
+function showTeamDetail(teamName, participants, data) {
+  const detail = document.getElementById('teamDetail');
+  const members = participants.filter(p => p.team === teamName).sort((a, b) => b.total_points - a.total_points);
+  const dailyBreakdown = data.daily_breakdown || [];
+  const teamBreakdown = dailyBreakdown.filter(r => r.team === teamName);
+
+  // Get actual roster size from team data
+  const teamInfo = (data.teams || []).find(t => t.name === teamName);
+  const totalMembers = teamInfo ? teamInfo.members : members.length;
+
+  document.getElementById('detailTitle').textContent = teamName;
+  document.getElementById('detailMeta').textContent = totalMembers + ' members';
+
+  // ─── Participation rate (active this week) ───
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setDate(weekStart.getDate() - 7);
+  const weekStartStr = weekStart.toISOString().slice(0, 10);
+  const activeThisWeek = new Set(teamBreakdown.filter(r => r.date >= weekStartStr).map(r => r.name));
+  const participatePct = Math.round((activeThisWeek.size / (totalMembers || 1)) * 100);
+
+  document.getElementById('teamParticipateNum').textContent = participatePct + '%';
+  document.getElementById('teamParticipateMeta').textContent = `${activeThisWeek.size} of ${totalMembers} active this week`;
+  const circumference = 2 * Math.PI * 52;
+  const ringFill = document.getElementById('teamRingFill');
+  ringFill.style.strokeDasharray = circumference;
+  ringFill.style.strokeDashoffset = circumference - (circumference * participatePct / 100);
+
+  // ─── Team sport donut ───
+  const sportCounts = {};
+  teamBreakdown.forEach(r => {
+    if (r.sport) sportCounts[r.sport] = (sportCounts[r.sport] || 0) + 1;
+  });
+  const sportLabels = Object.keys(sportCounts).sort((a, b) => sportCounts[b] - sportCounts[a]);
+  const sportData = sportLabels.map(s => sportCounts[s]);
+  const sportColors = ['#E2542F', '#2F7A4F', '#2C6E9E', '#F2A93B', '#6B4FA0', '#C24B7C', '#1F5636', '#B23F20'];
+
+  if (teamSportChart) teamSportChart.destroy();
+  if (sportLabels.length > 0) {
+    const ctx = document.getElementById('teamSportDonut').getContext('2d');
+    teamSportChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: sportLabels,
+        datasets: [{ data: sportData, backgroundColor: sportColors.slice(0, sportLabels.length), borderWidth: 2, borderColor: '#fff' }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
+    });
+  }
+
+  // ─── Weekly momentum (this week vs last week) ───
+  const lastWeekStart = new Date(weekStart);
+  lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  const lastWeekStr = lastWeekStart.toISOString().slice(0, 10);
+
+  let thisWeekPts = 0, lastWeekPts = 0;
+  teamBreakdown.forEach(r => {
+    if (r.date >= weekStartStr) thisWeekPts += r.points;
+    else if (r.date >= lastWeekStr) lastWeekPts += r.points;
+  });
+
+  if (teamMomentumChart) teamMomentumChart.destroy();
+  const momCtx = document.getElementById('teamMomentumChart').getContext('2d');
+  teamMomentumChart = new Chart(momCtx, {
+    type: 'bar',
+    data: {
+      labels: ['Last week', 'This week'],
+      datasets: [{
+        data: [lastWeekPts, thisWeekPts],
+        backgroundColor: [teamColor(teamName) + '80', teamColor(teamName)],
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } } }
+    }
+  });
+
+  // ─── Member contribution (horizontal stacked bar) ───
+  if (memberContribChart) memberContribChart.destroy();
+  const contribCtx = document.getElementById('memberContribChart').getContext('2d');
+  const memberNames = members.map(m => m.name);
+  const memberPts = members.map(m => m.total_points);
+  memberContribChart = new Chart(contribCtx, {
+    type: 'bar',
+    data: {
+      labels: memberNames,
+      datasets: [{
+        label: 'Points',
+        data: memberPts,
+        backgroundColor: memberNames.map((_, i) => sportColors[i % sportColors.length]),
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }, y: { grid: { display: false } } }
+    }
+  });
+
+  // ─── Member table ───
+  document.getElementById('detailBody').innerHTML = members.map((p, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${p.name}</td>
+      <td>${formatNumber(p.activity_points)}</td>
+      <td>${formatNumber(p.bonus_points)}</td>
+      <td><strong>${formatNumber(p.total_points)}</strong></td>
+      <td>${p.streak || 0}d</td>
+    </tr>
+  `).join('');
+
+  detail.style.display = 'block';
+}
+
+// ─── Head-to-head ───
+function setupH2H(data) {
+  const teams = data.teams || [];
+  const sel1 = document.getElementById('h2hTeam1');
+  const sel2 = document.getElementById('h2hTeam2');
+
+  const opts = teams.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
+  sel1.innerHTML = '<option value="">Select team</option>' + opts;
+  sel2.innerHTML = '<option value="">Select team</option>' + opts;
+
+  const handleChange = () => {
+    const t1 = sel1.value, t2 = sel2.value;
+    if (!t1 || !t2 || t1 === t2) { document.getElementById('h2hResult').innerHTML = ''; return; }
+    renderH2H(t1, t2, data);
+  };
+  sel1.onchange = handleChange;
+  sel2.onchange = handleChange;
+}
+
+function renderH2H(name1, name2, data) {
+  const t1 = data.teams.find(t => t.name === name1);
+  const t2 = data.teams.find(t => t.name === name2);
+  if (!t1 || !t2) return;
+
+  const members1 = data.participants.filter(p => p.team === name1);
+  const members2 = data.participants.filter(p => p.team === name2);
+
+  const avg1 = members1.length ? Math.round(t1.total_points / members1.length) : 0;
+  const avg2 = members2.length ? Math.round(t2.total_points / members2.length) : 0;
+
+  const streaks1 = members1.reduce((s, p) => s + (p.streak || 0), 0);
+  const streaks2 = members2.reduce((s, p) => s + (p.streak || 0), 0);
+
+  const sports1 = new Set(data.daily_breakdown.filter(r => r.team === name1).map(r => r.sport).filter(Boolean)).size;
+  const sports2 = new Set(data.daily_breakdown.filter(r => r.team === name2).map(r => r.sport).filter(Boolean)).size;
+
+  const rows = [
+    { label: 'Total points', v1: formatNumber(t1.total_points), v2: formatNumber(t2.total_points), w: t1.total_points >= t2.total_points ? 1 : 2 },
+    { label: 'Members', v1: members1.length, v2: members2.length, w: 0 },
+    { label: 'Avg pts/member', v1: formatNumber(avg1), v2: formatNumber(avg2), w: avg1 >= avg2 ? 1 : 2 },
+    { label: 'Total streaks', v1: streaks1 + 'd', v2: streaks2 + 'd', w: streaks1 >= streaks2 ? 1 : 2 },
+    { label: 'Sport variety', v1: sports1, v2: sports2, w: sports1 >= sports2 ? 1 : 2 },
+  ];
+
+  document.getElementById('h2hResult').innerHTML = `
+    <table class="h2h-table">
+      <thead><tr><th>${name1}</th><th>Metric</th><th>${name2}</th></tr></thead>
+      <tbody>
+        ${rows.map(r => `
+          <tr>
+            <td class="${r.w === 1 ? 'h2h-winner' : ''}">${r.v1}</td>
+            <td class="h2h-metric">${r.label}</td>
+            <td class="${r.w === 2 ? 'h2h-winner' : ''}">${r.v2}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+}
+</script>
+</body>
+</html>
