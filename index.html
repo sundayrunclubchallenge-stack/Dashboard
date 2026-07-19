@@ -101,6 +101,7 @@
       <div class="chart-wrap">
         <canvas id="dailyTrendChart"></canvas>
       </div>
+      <p class="chart-footnote">* Count of participants per day in last 7 days</p>
     </div>
 
     <div class="panel">
@@ -110,6 +111,7 @@
       <div class="chart-wrap chart-donut">
         <canvas id="sportDonutChart"></canvas>
       </div>
+      <p class="chart-footnote">* This displays count of sport played till date</p>
     </div>
   </div>
 
@@ -243,40 +245,60 @@ function renderOverview(data) {
     streakList.innerHTML = '<div class="empty-state"><div class="big">No streaks yet</div>Streaks build from Day 1.</div>';
   }
 
-  // ─── Daily activity trend ───
-  const dailyPoints = {};
+  // ─── Daily activity trend (participant count, last 7 days) ───
+  const dailyParticipants = {}; // date -> Set of names
   dailyBreakdown.forEach(r => {
-    dailyPoints[r.date] = (dailyPoints[r.date] || 0) + r.points;
+    if (!dailyParticipants[r.date]) dailyParticipants[r.date] = new Set();
+    dailyParticipants[r.date].add(r.name);
   });
-  const sortedDates = Object.keys(dailyPoints).sort();
-  const trendLabels = sortedDates.map(d => { const dt = new Date(d); return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }); });
-  const trendData = sortedDates.map(d => dailyPoints[d]);
+
+  // Filter to last 7 days only
+  const allDatesForTrend = Object.keys(dailyParticipants).sort();
+  const last7Dates = allDatesForTrend.slice(-7);
+  const trendLabels = last7Dates.map(d => { const dt = new Date(d); return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }); });
+  const trendData = last7Dates.map(d => dailyParticipants[d] ? dailyParticipants[d].size : 0);
 
   if (trendChart) trendChart.destroy();
   const trendCtx = document.getElementById('dailyTrendChart').getContext('2d');
   trendChart = new Chart(trendCtx, {
-    type: 'line',
+    type: 'bar',
     data: {
       labels: trendLabels,
       datasets: [{
-        label: 'Points',
+        label: 'Participants',
         data: trendData,
-        borderColor: '#2F7A4F',
-        backgroundColor: 'rgba(47,122,79,0.1)',
-        fill: true,
-        tension: 0.3,
-        pointRadius: sortedDates.length > 30 ? 0 : 3,
+        backgroundColor: 'rgba(16,185,129,0.7)',
+        borderColor: '#10B981',
+        borderWidth: 1,
+        borderRadius: 6,
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: { display: false },
+        datalabels: false,
+        tooltip: { callbacks: { label: ctx => ctx.parsed.y + ' participants' } }
+      },
       scales: {
         x: { grid: { display: false } },
-        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }
+        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { stepSize: 1 } }
       }
-    }
+    },
+    plugins: [{
+      id: 'barLabels',
+      afterDatasetsDraw(chart) {
+        const ctx2 = chart.ctx;
+        chart.data.datasets[0].data.forEach((val, i) => {
+          const meta = chart.getDatasetMeta(0).data[i];
+          ctx2.fillStyle = '#111827';
+          ctx2.font = 'bold 12px Manrope';
+          ctx2.textAlign = 'center';
+          ctx2.fillText(val, meta.x, meta.y - 6);
+        });
+      }
+    }]
   });
 
   // ─── Sport donut ───
@@ -285,7 +307,6 @@ function renderOverview(data) {
     const sport = r.sport || 'Other';
     if (sport && sport !== 'Other') sportCounts[sport] = (sportCounts[sport] || 0) + 1;
   });
-  // Fallback: use participants sports_this_week if breakdown has no sport data
   if (Object.keys(sportCounts).length === 0) {
     participants.forEach(p => {
       (p.sports_this_week || []).forEach(s => {
@@ -295,7 +316,7 @@ function renderOverview(data) {
   }
   const sportLabels = Object.keys(sportCounts).sort((a, b) => sportCounts[b] - sportCounts[a]);
   const sportData = sportLabels.map(s => sportCounts[s]);
-  const sportColors = ['#E2542F', '#2F7A4F', '#2C6E9E', '#F2A93B', '#6B4FA0', '#C24B7C', '#1F5636', '#B23F20'];
+  const sportColors = ['#F97316', '#10B981', '#3B82F6', '#FBBF24', '#6B4FA0', '#C24B7C', '#047857', '#EA580C', '#2563EB', '#D97706'];
 
   if (donutChart) donutChart.destroy();
   const donutCtx = document.getElementById('sportDonutChart').getContext('2d');
@@ -307,16 +328,38 @@ function renderOverview(data) {
         data: sportData,
         backgroundColor: sportColors.slice(0, sportLabels.length),
         borderWidth: 2,
-        borderColor: '#F3F5EE'
+        borderColor: '#FFFFFF'
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12, font: { size: 12 } } }
+        legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12, font: { size: 12 } } },
+        tooltip: { callbacks: { label: ctx => ctx.label + ': ' + ctx.parsed + ' entries' } }
       }
-    }
+    },
+    plugins: [{
+      id: 'donutLabels',
+      afterDatasetsDraw(chart) {
+        const ctx2 = chart.ctx;
+        const dataset = chart.getDatasetMeta(0);
+        dataset.data.forEach((arc, i) => {
+          const midAngle = (arc.startAngle + arc.endAngle) / 2;
+          const radius = (arc.innerRadius + arc.outerRadius) / 2;
+          const x = arc.x + Math.cos(midAngle) * radius;
+          const y = arc.y + Math.sin(midAngle) * radius;
+          const val = chart.data.datasets[0].data[i];
+          if (val > 0) {
+            ctx2.fillStyle = '#fff';
+            ctx2.font = 'bold 11px Manrope';
+            ctx2.textAlign = 'center';
+            ctx2.textBaseline = 'middle';
+            ctx2.fillText(val, x, y);
+          }
+        });
+      }
+    }]
   });
 
   // ─── Team race chart ───

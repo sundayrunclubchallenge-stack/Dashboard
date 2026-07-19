@@ -175,6 +175,7 @@ a{color:inherit}
 /* ---------- Stat grid ---------- */
 .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:36px}
 @media (max-width:820px){.stat-grid{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:480px){.stat-grid{grid-template-columns:1fr}}
 .stat-card{
   background:rgba(255,255,255,0.08);
   backdrop-filter:blur(4px);
@@ -264,6 +265,21 @@ a{color:inherit}
 }
 .member-table td{padding:10px;border-bottom:1px solid var(--line);font-size:14px}
 .member-table tr:hover td{background:var(--bg-alt)}
+
+/* Mobile table scroll */
+@media (max-width:640px){
+  .panel{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .member-table{min-width:520px}
+  .wrap{padding:0 16px}
+  .nav .wrap{gap:8px}
+  .nav-brand .name{display:none}
+  .hero h1{font-size:clamp(40px,12vw,64px)}
+  .stat-card .num{font-size:44px}
+  .section-head h2{font-size:22px}
+  .lb-controls{gap:6px}
+  .lb-controls button{padding:6px 10px;font-size:12px}
+  .podium{grid-template-columns:1fr;gap:10px}
+}
 
 /* ---------- Individuals page ---------- */
 .search-box{position:relative;max-width:420px}
@@ -399,6 +415,7 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;font-
 .chart-wrap{position:relative;height:260px}
 .chart-wrap.chart-donut{height:280px}
 .chart-wrap.chart-wide{height:300px}
+.chart-footnote{font-size:11px;color:var(--ink-faint);margin:8px 0 0;font-style:italic}
 
 /* ---------- Engagement ring ---------- */
 .engagement-ring-wrap{display:flex;flex-direction:column;align-items:center;padding:20px 0}
