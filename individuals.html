@@ -183,7 +183,7 @@ function renderProfile(p) {
   const sportsSet = new Set(personDays.map(r => r.sport).filter(Boolean));
   if (sportsSet.size >= 5) milestones.push({ label: 'Variety Bonus', icon: '🌈' });
 
-  const allSports = ["Running","Cycling","Walking","Swimming","Yoga","Football / Soccer","Badminton","Tennis","Basketball","Hiking"];
+  const allSports = ["Running","Cycling","Walking","Swimming","Hiking","Rowing","Triathlon","Badminton","Tennis","Table Tennis","Squash","Pickleball","Football / Soccer","Cricket","Basketball","Volleyball","Baseball","Rugby","Hockey","Kabaddi","Kho Kho","Golf","Archery","Bowling","Snooker / Billiards","Meditation","Chess","Wrestling","Boxing","Judo","Karate","Taekwondo","MMA","Weightlifting","Powerlifting","CrossFit","Gym Workout","Yoga","Pilates","Skating","Skiing","Snowboarding","Surfing","Diving","Canoeing","Kayaking","Rock Climbing","Mountaineering","Horse Riding","Suryanamaskar","Stair Climbing","Dance","Zumba"];
   const active = new Set(p.sports_this_week || []);
 
   document.getElementById('profilePanel').innerHTML = `
