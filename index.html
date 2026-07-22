@@ -129,6 +129,19 @@
     </div>
   </div>
 
+  <!-- Daily points by team -->
+  <div class="wrap" style="margin-bottom:32px">
+    <div class="panel">
+      <div class="section-head">
+        <h2>Daily points by team</h2>
+        <span class="hint">last 7 days</span>
+      </div>
+      <div class="chart-wrap chart-wide">
+        <canvas id="dailyPointsChart"></canvas>
+      </div>
+    </div>
+  </div>
+
   <!-- Participation heatmap -->
   <div class="wrap" style="margin-bottom:32px">
     <div class="panel">
@@ -186,7 +199,7 @@
 <script>
 markActiveNav('overview');
 
-let trendChart, donutChart, raceChart;
+let trendChart, donutChart, raceChart, dailyPointsChart;
 
 function renderOverview(data) {
   renderSyncBadge(document.getElementById('syncBadge'), data.generated_at);
@@ -402,6 +415,39 @@ function renderOverview(data) {
   raceChart = new Chart(raceCtx, {
     type: 'line',
     data: { labels: raceLabels, datasets: raceDatasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12, font: { size: 12 } } } },
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }
+      }
+    }
+  });
+
+  // ─── Daily points by team (last 7 days, non-cumulative) ───
+  const last7DatesPts = allDates.slice(-7);
+  const dailyPointsDatasets = teamNames.map((team, idx) => {
+    const dailyData = last7DatesPts.map(d => teamDailyPts[team][d] || 0);
+    return {
+      label: team,
+      data: dailyData,
+      borderColor: TEAM_PALETTE[idx % TEAM_PALETTE.length].hex,
+      backgroundColor: 'transparent',
+      tension: 0.3,
+      pointRadius: 3,
+      borderWidth: 2.5
+    };
+  });
+
+  const dailyPointsLabels = last7DatesPts.map(d => { const dt = new Date(d); return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }); });
+
+  if (dailyPointsChart) dailyPointsChart.destroy();
+  const dailyPointsCtx = document.getElementById('dailyPointsChart').getContext('2d');
+  dailyPointsChart = new Chart(dailyPointsCtx, {
+    type: 'line',
+    data: { labels: dailyPointsLabels, datasets: dailyPointsDatasets },
     options: {
       responsive: true,
       maintainAspectRatio: false,
