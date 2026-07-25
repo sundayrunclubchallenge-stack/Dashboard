@@ -565,6 +565,33 @@ function renderOverview(data) {
     `).join('')
     : '<div class="empty-state"><div class="big">Quiet so far</div>Bonus awards and milestones will appear here.</div>';
 
+  // ─── Match feed panel height to Top performers panel, scroll internally past that ───
+  requestAnimationFrame(() => {
+    const topPanel = podiumEl.closest('.panel');
+    const feedPanel = feedList.closest('.panel');
+    if (!topPanel || !feedPanel) return;
+
+    // Temporarily release grid stretch + any prior cap so we can read natural (unstretched) heights
+    const prevTopAlign = topPanel.style.alignSelf;
+    const prevFeedAlign = feedPanel.style.alignSelf;
+    topPanel.style.alignSelf = 'start';
+    feedPanel.style.alignSelf = 'start';
+    feedList.style.maxHeight = 'none';
+    feedList.style.overflowY = 'visible';
+
+    const topNaturalHeight = topPanel.offsetHeight;
+    const feedChrome = feedPanel.offsetHeight - feedList.offsetHeight; // section-head + padding above/below feedList
+
+    topPanel.style.alignSelf = prevTopAlign;
+    feedPanel.style.alignSelf = prevFeedAlign;
+
+    const targetFeedListHeight = topNaturalHeight - feedChrome;
+    if (targetFeedListHeight > 40) {
+      feedList.style.maxHeight = targetFeedListHeight + 'px';
+      feedList.style.overflowY = 'auto';
+    }
+  });
+
   // ─── Team preview cards ───
   const teamPreview = document.getElementById('teamPreview');
   const rankedTeams = [...teams].sort((a, b) => b.total_points - a.total_points);
