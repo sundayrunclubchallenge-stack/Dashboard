@@ -20,6 +20,7 @@
       <li><a href="teams.html" data-page="teams">Teams</a></li>
       <li><a href="individuals.html" data-page="individuals">Individuals</a></li>
       <li><a href="weekly.html" data-page="weekly">Weekly</a></li>
+      <li><a href="sports.html" data-page="sports">Sports</a></li>
     </ul>
     <span class="sync-badge" id="syncBadge"></span>
   </div>
@@ -253,12 +254,33 @@ function renderProfile(p) {
     </div>
   `;
 
-  // Render personal trend chart
-  const dailyPts = {};
-  personDays.forEach(r => { dailyPts[r.date] = (dailyPts[r.date] || 0) + r.points; });
-  const trendDates = Object.keys(dailyPts).sort();
+  // Render personal trend chart (stacked by sport, colors match donut)
+  const sportLabels = Object.keys(personSports).sort((a, b) => personSports[b] - personSports[a]);
+  const sportData = sportLabels.map(s => personSports[s]);
+  const sportColors = ['#E2542F', '#2F7A4F', '#2C6E9E', '#F2A93B', '#6B4FA0', '#C24B7C', '#1F5636', '#B23F20'];
+
+  // Build sport -> color map (same order as donut)
+  const sportColorMap = {};
+  sportLabels.forEach((s, i) => { sportColorMap[s] = sportColors[i % sportColors.length]; });
+
+  // Build per-sport per-date points: { sport -> { date -> points } }
+  const sportByDate = {};
+  personDays.forEach(r => {
+    const sport = r.sport || 'Other';
+    if (!sportByDate[sport]) sportByDate[sport] = {};
+    sportByDate[sport][r.date] = (sportByDate[sport][r.date] || 0) + r.points;
+  });
+
+  const trendDates = [...new Set(personDays.map(r => r.date))].sort();
   const trendLabels = trendDates.map(d => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }));
-  const trendData = trendDates.map(d => dailyPts[d]);
+
+  // Create one dataset per sport
+  const trendDatasets = sportLabels.map(sport => ({
+    label: sport,
+    data: trendDates.map(d => (sportByDate[sport] && sportByDate[sport][d]) || 0),
+    backgroundColor: sportColorMap[sport],
+    borderRadius: 4,
+  }));
 
   if (personalChart) personalChart.destroy();
   const trendCtx = document.getElementById('personalTrendChart').getContext('2d');
@@ -266,28 +288,44 @@ function renderProfile(p) {
     type: 'bar',
     data: {
       labels: trendLabels,
-      datasets: [{
-        label: 'Points',
-        data: trendData,
-        backgroundColor: 'rgba(47,122,79,0.7)',
-        borderRadius: 4,
-      }]
+      datasets: trendDatasets
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
+      layout: { padding: { top: 24 } },
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 11 } } } },
       scales: {
-        x: { grid: { display: false } },
-        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }
+        x: { stacked: true, grid: { display: false } },
+        y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }
       }
-    }
+    },
+    plugins: [{
+      id: 'stackedBarTotals',
+      afterDatasetsDraw(chart) {
+        const ctx2 = chart.ctx;
+        const datasets = chart.data.datasets;
+        const meta0 = chart.getDatasetMeta(0);
+        meta0.data.forEach((bar, i) => {
+          let total = 0;
+          datasets.forEach(ds => { total += ds.data[i] || 0; });
+          // Find the top of the stacked bar (last visible dataset)
+          let topY = bar.y;
+          for (let d = datasets.length - 1; d >= 0; d--) {
+            const meta = chart.getDatasetMeta(d);
+            if (!meta.hidden && meta.data[i]) {
+              topY = meta.data[i].y;
+              break;
+            }
+          }
+          ctx2.fillStyle = '#111827';
+          ctx2.font = 'bold 11px Manrope';
+          ctx2.textAlign = 'center';
+          ctx2.fillText(formatNumber(total), bar.x, topY - 6);
+        });
+      }
+    }]
   });
-
-  // Render personal sport donut
-  const sportLabels = Object.keys(personSports).sort((a, b) => personSports[b] - personSports[a]);
-  const sportData = sportLabels.map(s => personSports[s]);
-  const sportColors = ['#E2542F', '#2F7A4F', '#2C6E9E', '#F2A93B', '#6B4FA0', '#C24B7C', '#1F5636', '#B23F20'];
 
   if (personalDonut) personalDonut.destroy();
   if (sportLabels.length > 0) {

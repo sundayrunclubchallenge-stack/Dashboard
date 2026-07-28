@@ -20,6 +20,7 @@
       <li><a href="teams.html" data-page="teams">Teams</a></li>
       <li><a href="individuals.html" data-page="individuals">Individuals</a></li>
       <li><a href="weekly.html" data-page="weekly">Weekly</a></li>
+      <li><a href="sports.html" data-page="sports">Sports</a></li>
     </ul>
     <span class="sync-badge" id="syncBadge"></span>
   </div>
@@ -38,9 +39,15 @@
   <div class="wrap">
     <div class="section-head">
       <h2>Team leaderboard</h2>
-      <div class="date-filter">
-        <button class="filter-btn active" id="btnAllTime" data-filter="all">All time</button>
-        <input type="date" class="filter-date" id="filterDate" title="Pick a specific date">
+      <div class="lb-controls" style="align-items:center">
+        <button class="filter-btn active" data-lb-filter="all">All time</button>
+        <button class="filter-btn" data-lb-filter="7">Last 7 days</button>
+        <button class="filter-btn" data-lb-filter="14">Last 14 days</button>
+        <button class="filter-btn" data-lb-filter="30">Last 30 days</button>
+        <span style="font-size:12px;color:var(--ink-faint);margin-left:8px">or</span>
+        <input type="date" class="filter-date" id="lbDateFrom" title="From date">
+        <span style="font-size:12px;color:var(--ink-faint)">to</span>
+        <input type="date" class="filter-date" id="lbDateTo" title="To date">
       </div>
     </div>
     <div class="team-grid" id="teamGrid"></div>
@@ -52,6 +59,18 @@
       <div class="section-head">
         <h2 id="detailTitle">Team</h2>
         <span class="hint" id="detailMeta"></span>
+      </div>
+
+      <!-- Date range filter for team detail -->
+      <div class="lb-controls" style="margin-bottom:16px;align-items:center">
+        <button class="filter-btn active" data-detail-filter="all">All time</button>
+        <button class="filter-btn" data-detail-filter="7">Last 7 days</button>
+        <button class="filter-btn" data-detail-filter="14">Last 14 days</button>
+        <button class="filter-btn" data-detail-filter="30">Last 30 days</button>
+        <span style="font-size:12px;color:var(--ink-faint);margin-left:8px">or</span>
+        <input type="date" class="filter-date" id="detailDateFrom" title="From date">
+        <span style="font-size:12px;color:var(--ink-faint)">to</span>
+        <input type="date" class="filter-date" id="detailDateTo" title="To date">
       </div>
 
       <!-- Participation rate + Team sport donut -->
@@ -83,7 +102,9 @@
 
       <!-- Member contribution chart -->
       <div class="section-head" style="margin:20px 0 8px"><h2 style="font-size:16px">Member contribution</h2></div>
-      <div class="chart-wrap" style="height:200px"><canvas id="memberContribChart"></canvas></div>
+      <div style="max-height:400px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;padding:8px">
+        <div id="memberContribWrap" style="height:200px"><canvas id="memberContribChart"></canvas></div>
+      </div>
 
       <!-- Member table -->
       <div class="section-head" style="margin:24px 0 8px"><h2 style="font-size:16px">Members</h2></div>
@@ -134,6 +155,9 @@ let _fullData = null;
 let teamSportChart = null;
 let teamMomentumChart = null;
 let memberContribChart = null;
+let _currentTeam = null;
+let _detailDateRange = null; // null = all time, or { from: 'yyyy-MM-dd', to: 'yyyy-MM-dd' }
+let _lbDateRange = null; // null = all time, or { from: 'yyyy-MM-dd', to: 'yyyy-MM-dd' }
 
 fetchDashboard().then(data => {
   _fullData = data;
@@ -143,6 +167,7 @@ fetchDashboard().then(data => {
   renderTeamsView(data, null);
   setupDateFilter();
   setupH2H(data);
+  setupDetailDateFilter();
 
 }).catch(err => {
   document.getElementById('battleBars').innerHTML =
@@ -151,36 +176,55 @@ fetchDashboard().then(data => {
 
 window.addEventListener('dashboardFreshData', e => {
   _fullData = e.detail;
-  const filterDate = document.getElementById('filterDate').value || null;
-  renderTeamsView(_fullData, filterDate);
+  renderTeamsView(_fullData, _lbDateRange);
   setupH2H(_fullData);
 });
 
 function setupDateFilter() {
-  const btnAll = document.getElementById('btnAllTime');
-  const datePicker = document.getElementById('filterDate');
+  const buttons = document.querySelectorAll('[data-lb-filter]');
+  const dateFrom = document.getElementById('lbDateFrom');
+  const dateTo = document.getElementById('lbDateTo');
 
-  btnAll.addEventListener('click', () => {
-    datePicker.value = '';
-    btnAll.classList.add('active');
-    renderTeamsView(_fullData, null);
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      buttons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      dateFrom.value = '';
+      dateTo.value = '';
+
+      const val = btn.dataset.lbFilter;
+      if (val === 'all') {
+        _lbDateRange = null;
+      } else {
+        const days = parseInt(val);
+        const to = new Date();
+        const from = new Date();
+        from.setDate(from.getDate() - days);
+        _lbDateRange = { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+      }
+      renderTeamsView(_fullData, _lbDateRange);
+    });
   });
 
-  datePicker.addEventListener('change', () => {
-    const val = datePicker.value;
-    if (val) {
-      btnAll.classList.remove('active');
-      renderTeamsView(_fullData, val);
+  const applyCustomRange = () => {
+    const from = dateFrom.value;
+    const to = dateTo.value;
+    if (from && to) {
+      buttons.forEach(b => b.classList.remove('active'));
+      _lbDateRange = { from, to };
+      renderTeamsView(_fullData, _lbDateRange);
     }
-  });
+  };
+  dateFrom.addEventListener('change', applyCustomRange);
+  dateTo.addEventListener('change', applyCustomRange);
 }
 
-function renderTeamsView(data, filterDate) {
+function renderTeamsView(data, dateRange) {
   let { teams, participants } = data;
   const dailyBreakdown = data.daily_breakdown || [];
 
-  if (filterDate) {
-    const filtered = dailyBreakdown.filter(r => r.date === filterDate);
+  if (dateRange) {
+    const filtered = dailyBreakdown.filter(r => r.date >= dateRange.from && r.date <= dateRange.to);
     const pMap = {};
     filtered.forEach(r => {
       if (!pMap[r.name]) pMap[r.name] = { name: r.name, team: r.team, activity_points: 0, bonus_points: 0, total_points: 0, streak: 0 };
@@ -230,37 +274,64 @@ function renderTeamsView(data, filterDate) {
   `).join('');
 
   teamGrid.querySelectorAll('.team-card').forEach(card => {
-    card.addEventListener('click', () => showTeamDetail(card.dataset.team, participants, data));
+    card.addEventListener('click', () => showTeamDetail(card.dataset.team, data.participants, data));
   });
 
-  if (rankedTeams.length) showTeamDetail(rankedTeams[0].name, participants, data);
+  if (rankedTeams.length) showTeamDetail(rankedTeams[0].name, data.participants, data);
 }
 
 function cssId(name) { return name.toLowerCase().replace(/[^a-z0-9]+/g, '-'); }
 
 function showTeamDetail(teamName, participants, data) {
+  _currentTeam = teamName;
   const detail = document.getElementById('teamDetail');
   const members = participants.filter(p => p.team === teamName).sort((a, b) => b.total_points - a.total_points);
   const dailyBreakdown = data.daily_breakdown || [];
-  const teamBreakdown = dailyBreakdown.filter(r => r.team === teamName);
+  let teamBreakdown = dailyBreakdown.filter(r => r.team === teamName);
+
+  // Apply date range filter if set
+  if (_detailDateRange) {
+    teamBreakdown = teamBreakdown.filter(r => r.date >= _detailDateRange.from && r.date <= _detailDateRange.to);
+  }
 
   // Get actual roster size from team data
   const teamInfo = (data.teams || []).find(t => t.name === teamName);
   const totalMembers = teamInfo ? teamInfo.members : members.length;
 
+  // If date range is active, recalculate member points from filtered breakdown
+  let displayMembers = members;
+  if (_detailDateRange) {
+    const memberPtsMap = {};
+    members.forEach(m => { memberPtsMap[m.name] = { ...m, activity_points: 0, bonus_points: 0, total_points: 0 }; });
+    teamBreakdown.forEach(r => {
+      if (memberPtsMap[r.name]) {
+        memberPtsMap[r.name].activity_points += r.points;
+        memberPtsMap[r.name].total_points += r.points;
+      }
+    });
+    displayMembers = Object.values(memberPtsMap).sort((a, b) => b.total_points - a.total_points);
+  }
+
   document.getElementById('detailTitle').textContent = teamName;
   document.getElementById('detailMeta').textContent = totalMembers + ' members';
 
-  // ─── Participation rate (active this week) ───
+  // ─── Participation rate (active in range or this week) ───
   const now = new Date();
-  const weekStart = new Date(now);
-  weekStart.setDate(weekStart.getDate() - 7);
-  const weekStartStr = weekStart.toISOString().slice(0, 10);
-  const activeThisWeek = new Set(teamBreakdown.filter(r => r.date >= weekStartStr).map(r => r.name));
-  const participatePct = Math.round((activeThisWeek.size / (totalMembers || 1)) * 100);
+  let participateFrom, participateLabel;
+  if (_detailDateRange) {
+    participateFrom = _detailDateRange.from;
+    participateLabel = 'active in range';
+  } else {
+    const weekStart = new Date(now);
+    weekStart.setDate(weekStart.getDate() - 7);
+    participateFrom = weekStart.toISOString().slice(0, 10);
+    participateLabel = 'active this week';
+  }
+  const activeInRange = new Set(teamBreakdown.filter(r => r.date >= participateFrom).map(r => r.name));
+  const participatePct = Math.round((activeInRange.size / (totalMembers || 1)) * 100);
 
   document.getElementById('teamParticipateNum').textContent = participatePct + '%';
-  document.getElementById('teamParticipateMeta').textContent = `${activeThisWeek.size} of ${totalMembers} active this week`;
+  document.getElementById('teamParticipateMeta').textContent = `${activeInRange.size} of ${totalMembers} ${participateLabel}`;
   const circumference = 2 * Math.PI * 52;
   const ringFill = document.getElementById('teamRingFill');
   ringFill.style.strokeDasharray = circumference;
@@ -288,26 +359,39 @@ function showTeamDetail(teamName, participants, data) {
     });
   }
 
-  // ─── Weekly momentum (this week vs last week) ───
-  const lastWeekStart = new Date(weekStart);
-  lastWeekStart.setDate(lastWeekStart.getDate() - 7);
-  const lastWeekStr = lastWeekStart.toISOString().slice(0, 10);
+  // ─── Weekly momentum (event weeks: Week 1 = Jul 20–26, Week 2 = Jul 27–Aug 2, etc.) ───
+  const eventStart = new Date(data.event.start_date + 'T00:00:00+05:30');
+  const today = new Date();
+  const daysSinceStart = Math.floor((today - eventStart) / 86400000);
+  const currentWeekNum = Math.floor(daysSinceStart / 7) + 1;
 
-  let thisWeekPts = 0, lastWeekPts = 0;
-  teamBreakdown.forEach(r => {
-    if (r.date >= weekStartStr) thisWeekPts += r.points;
-    else if (r.date >= lastWeekStr) lastWeekPts += r.points;
+  // Calculate points per event week from unfiltered team data
+  const fullTeamBreakdown = dailyBreakdown.filter(r => r.team === teamName);
+  const weekPoints = {}; // weekNum -> points
+  fullTeamBreakdown.forEach(r => {
+    const rDate = new Date(r.date + 'T00:00:00+05:30');
+    const daysFromStart = Math.floor((rDate - eventStart) / 86400000);
+    if (daysFromStart < 0) return;
+    const wk = Math.floor(daysFromStart / 7) + 1;
+    weekPoints[wk] = (weekPoints[wk] || 0) + r.points;
   });
+
+  const weekLabels = [];
+  const weekData = [];
+  for (let w = 1; w <= currentWeekNum; w++) {
+    weekLabels.push('Week ' + w);
+    weekData.push(weekPoints[w] || 0);
+  }
 
   if (teamMomentumChart) teamMomentumChart.destroy();
   const momCtx = document.getElementById('teamMomentumChart').getContext('2d');
   teamMomentumChart = new Chart(momCtx, {
     type: 'bar',
     data: {
-      labels: ['Last week', 'This week'],
+      labels: weekLabels,
       datasets: [{
-        data: [lastWeekPts, thisWeekPts],
-        backgroundColor: [teamColor(teamName) + '80', teamColor(teamName)],
+        data: weekData,
+        backgroundColor: weekLabels.map((_, i) => i === weekLabels.length - 1 ? teamColor(teamName) : teamColor(teamName) + '80'),
         borderRadius: 6,
       }]
     },
@@ -321,9 +405,15 @@ function showTeamDetail(teamName, participants, data) {
 
   // ─── Member contribution (horizontal stacked bar) ───
   if (memberContribChart) memberContribChart.destroy();
+  const memberNames = displayMembers.map(m => m.name);
+  const memberPts = displayMembers.map(m => m.total_points);
+
+  // Dynamic height: 40px per member, minimum 200px
+  const dynamicHeight = Math.max(200, memberNames.length * 40);
+  const contribWrap = document.getElementById('memberContribWrap');
+  contribWrap.style.height = dynamicHeight + 'px';
+
   const contribCtx = document.getElementById('memberContribChart').getContext('2d');
-  const memberNames = members.map(m => m.name);
-  const memberPts = members.map(m => m.total_points);
   memberContribChart = new Chart(contribCtx, {
     type: 'bar',
     data: {
@@ -339,13 +429,31 @@ function showTeamDetail(teamName, participants, data) {
       indexAxis: 'y',
       responsive: true,
       maintainAspectRatio: false,
+      layout: { padding: { right: 40 } },
       plugins: { legend: { display: false } },
-      scales: { x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }, y: { grid: { display: false } } }
-    }
+      scales: {
+        x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+        y: { grid: { display: false }, ticks: { font: { size: 12, weight: '600' }, padding: 4 } }
+      }
+    },
+    plugins: [{
+      id: 'barValueLabels',
+      afterDatasetsDraw(chart) {
+        const ctx2 = chart.ctx;
+        chart.getDatasetMeta(0).data.forEach((bar, i) => {
+          const val = chart.data.datasets[0].data[i];
+          ctx2.fillStyle = '#111827';
+          ctx2.font = 'bold 11px Manrope';
+          ctx2.textAlign = 'left';
+          ctx2.textBaseline = 'middle';
+          ctx2.fillText(formatNumber(val), bar.x + 6, bar.y);
+        });
+      }
+    }]
   });
 
   // ─── Member table ───
-  document.getElementById('detailBody').innerHTML = members.map((p, i) => `
+  document.getElementById('detailBody').innerHTML = displayMembers.map((p, i) => `
     <tr>
       <td>${i + 1}</td>
       <td>${p.name}</td>
@@ -376,6 +484,49 @@ function setupH2H(data) {
   };
   sel1.onchange = handleChange;
   sel2.onchange = handleChange;
+}
+
+function setupDetailDateFilter() {
+  const buttons = document.querySelectorAll('[data-detail-filter]');
+  const dateFrom = document.getElementById('detailDateFrom');
+  const dateTo = document.getElementById('detailDateTo');
+
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      buttons.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      dateFrom.value = '';
+      dateTo.value = '';
+
+      const val = btn.dataset.detailFilter;
+      if (val === 'all') {
+        _detailDateRange = null;
+      } else {
+        const days = parseInt(val);
+        const to = new Date();
+        const from = new Date();
+        from.setDate(from.getDate() - days);
+        _detailDateRange = { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+      }
+      if (_currentTeam && _fullData) {
+        showTeamDetail(_currentTeam, _fullData.participants, _fullData);
+      }
+    });
+  });
+
+  const applyCustomRange = () => {
+    const from = dateFrom.value;
+    const to = dateTo.value;
+    if (from && to) {
+      buttons.forEach(b => b.classList.remove('active'));
+      _detailDateRange = { from, to };
+      if (_currentTeam && _fullData) {
+        showTeamDetail(_currentTeam, _fullData.participants, _fullData);
+      }
+    }
+  };
+  dateFrom.addEventListener('change', applyCustomRange);
+  dateTo.addEventListener('change', applyCustomRange);
 }
 
 function renderH2H(name1, name2, data) {
