@@ -175,14 +175,20 @@ function renderProfile(p) {
     if (r.sport) personSports[r.sport] = (personSports[r.sport] || 0) + 1;
   });
 
-  // Milestones from bonus data (inferred from streak)
+  // Milestones from actual bonus data
   const milestones = [];
-  if (p.streak >= 7) milestones.push({ label: '7-Day Streak', icon: '🔥' });
-  if (p.streak >= 30) milestones.push({ label: '30-Day Streak', icon: '⚡' });
-  if (p.streak >= 50) milestones.push({ label: '50-Day Streak', icon: '💎' });
-  if (p.streak >= 100) milestones.push({ label: '100 Days Full Finish', icon: '🏆' });
-  const sportsSet = new Set(personDays.map(r => r.sport).filter(Boolean));
-  if (sportsSet.size >= 5) milestones.push({ label: 'Variety Bonus', icon: '🌈' });
+  const bonusIcons = {
+    '7-Day Streak': '🔥',
+    '30-Day Streak': '⚡',
+    '50-Day Streak': '💎',
+    '100 Days Full Finish': '🏆',
+    'Variety Bonus': '🌈'
+  };
+  if (p.bonuses) {
+    Object.entries(p.bonuses).forEach(([type, count]) => {
+      milestones.push({ label: type, icon: bonusIcons[type] || '⭐', count: count });
+    });
+  }
 
   const allSports = ["Running","Cycling","Walking","Swimming","Hiking","Rowing","Triathlon","Badminton","Tennis","Table Tennis","Squash","Pickleball","Football / Soccer","Cricket","Basketball","Volleyball","Baseball","Rugby","Hockey","Kabaddi","Kho Kho","Golf","Archery","Bowling","Snooker / Billiards","Meditation","Chess","Wrestling","Boxing","Judo","Karate","Taekwondo","MMA","Weightlifting","Powerlifting","CrossFit","Gym Workout","Yoga","Pilates","Skating","Skiing","Snowboarding","Surfing","Diving","Canoeing","Kayaking","Rock Climbing","Mountaineering","Horse Riding","Suryanamaskar","Stair Climbing","Dance","Zumba"];
   const active = new Set(p.sports_this_week || []);
@@ -226,7 +232,7 @@ function renderProfile(p) {
       ${milestones.length ? `
       <div class="section-head" style="margin:20px 0 8px"><h2 style="font-size:18px">Milestones earned</h2></div>
       <div class="milestones-row">
-        ${milestones.map(m => `<span class="milestone-badge">${m.icon} ${m.label}</span>`).join('')}
+        ${milestones.map(m => `<span class="milestone-badge">${m.icon} ${m.label}${m.count > 1 ? ' ×' + m.count : ''}</span>`).join('')}
       </div>
       ` : ''}
 
