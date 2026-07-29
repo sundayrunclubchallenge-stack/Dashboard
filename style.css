@@ -74,6 +74,55 @@ a{color:inherit}
   .stat-card{animation:none!important}
 }
 
+/* ---------- Ticker ribbon ---------- */
+.ticker-wrap{
+  background:linear-gradient(90deg, #0f0c29, #302b63, #24243e);
+  overflow:hidden;
+  white-space:nowrap;
+  position:sticky;
+  top:64px;
+  z-index:19;
+  border-bottom:2px solid rgba(255,0,128,0.3);
+  box-shadow:0 2px 12px rgba(255,0,128,0.15);
+}
+.ticker-wrap:hover .ticker-track{animation-play-state:paused}
+.ticker-track{
+  display:inline-block;
+  white-space:nowrap;
+  animation:tickerScroll var(--ticker-duration, 30s) linear infinite;
+}
+.ticker-item{
+  display:inline;
+  font-family:var(--body);
+  font-size:13px;
+  color:rgba(255,255,255,0.9);
+  padding:10px 0;
+  line-height:38px;
+}
+.ticker-item .sport-name{font-weight:800;color:#00f5a0;text-transform:uppercase;letter-spacing:0.5px}
+.ticker-item .person-name{font-weight:700;color:#fff;text-shadow:0 0 6px rgba(0,245,160,0.4)}
+.ticker-item .team-name{font-weight:500;color:#c084fc;font-size:12px}
+.ticker-item .pts{font-family:var(--mono);font-weight:700;color:#fbbf24;text-shadow:0 0 8px rgba(251,191,36,0.5)}
+.ticker-dot{color:#ff006e;margin:0 16px;font-size:12px;vertical-align:middle;text-shadow:0 0 6px rgba(255,0,110,0.6)}
+.ticker-empty{
+  display:block;
+  text-align:center;
+  font-family:var(--body);
+  font-size:13px;
+  color:rgba(255,255,255,0.5);
+  padding:10px 0;
+  line-height:38px;
+}
+
+@keyframes tickerScroll{
+  0%{transform:translateX(0)}
+  100%{transform:translateX(-50%)}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .ticker-track{animation:none!important}
+}
+
 /* ---------- Nav ---------- */
 .nav{
   position:sticky;top:0;z-index:20;

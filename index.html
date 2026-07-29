@@ -27,6 +27,11 @@
   </div>
 </nav>
 
+<!-- Today's top performers ticker -->
+<div class="ticker-wrap" id="tickerWrap">
+  <span class="ticker-empty">No activities updated for today till now</span>
+</div>
+
 <header class="hero">
   <div class="wrap">
     <p class="eyebrow animate-fade-up" style="animation-delay:0.1s">Event overview</p>
@@ -203,6 +208,7 @@ markActiveNav('overview');
 let trendChart, donutChart, raceChart, dailyPointsChart;
 
 function renderOverview(data) {
+  renderTicker(data);
   renderSyncBadge(document.getElementById('syncBadge'), data.generated_at);
   document.getElementById('footSync').textContent = 'Last synced: ' + new Date(data.generated_at).toLocaleString('en-IN');
 
@@ -610,6 +616,78 @@ fetchDashboard().then(renderOverview).catch(err => {
 });
 
 window.addEventListener('dashboardFreshData', e => renderOverview(e.detail));
+
+function renderTicker(data) {
+  const tickerWrap = document.getElementById('tickerWrap');
+  const dailyBreakdown = data.daily_breakdown || [];
+
+  // Get today's date in IST (yyyy-MM-dd)
+  const now = new Date();
+  const istOffset = 5.5 * 60 * 60 * 1000;
+  const istNow = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + istOffset);
+  const todayStr = istNow.getFullYear() + '-' +
+    String(istNow.getMonth() + 1).padStart(2, '0') + '-' +
+    String(istNow.getDate()).padStart(2, '0');
+
+  // Filter to today's entries only
+  const todayEntries = dailyBreakdown.filter(r => r.date === todayStr);
+
+  if (todayEntries.length === 0) {
+    tickerWrap.innerHTML = '<span class="ticker-empty">No activities updated for today till now</span>';
+    return;
+  }
+
+  // Group by sport → find top performer(s)
+  const sportMap = {}; // sport -> { maxPts, leaders: [{name, team}] }
+  todayEntries.forEach(r => {
+    if (!r.sport) return;
+    if (!sportMap[r.sport]) sportMap[r.sport] = {};
+    // Accumulate points per person per sport
+    const key = r.name;
+    if (!sportMap[r.sport][key]) sportMap[r.sport][key] = { name: r.name, team: r.team, pts: 0 };
+    sportMap[r.sport][key].pts += r.points;
+  });
+
+  // For each sport, find the max and all who tie
+  const tickerItems = [];
+  Object.keys(sportMap).sort().forEach(sport => {
+    const people = Object.values(sportMap[sport]);
+    const maxPts = Math.max(...people.map(p => p.pts));
+    const leaders = people.filter(p => p.pts === maxPts);
+
+    const names = leaders.map(l => l.name).join(' & ');
+    const teams = [...new Set(leaders.map(l => l.team))].join(', ');
+
+    tickerItems.push(
+      '<span class="ticker-item">' +
+        '<span class="sport-name">' + sport + '</span>: ' +
+        '<span class="person-name">' + names + '</span> ' +
+        '<span class="team-name">(' + teams + ')</span> — ' +
+        '<span class="pts">' + formatNumber(maxPts) + ' pts</span>' +
+      '</span>'
+    );
+  });
+
+  const separator = '<span class="ticker-dot">●</span>';
+  const contentHtml = tickerItems.join(separator);
+
+  // Duplicate content for seamless infinite scroll
+  const trackHtml = '<div class="ticker-track">' +
+    contentHtml + separator + contentHtml + separator +
+    '</div>';
+
+  tickerWrap.innerHTML = trackHtml;
+
+  // Adjust speed based on content width (aim for ~60px/sec)
+  requestAnimationFrame(() => {
+    const track = tickerWrap.querySelector('.ticker-track');
+    if (track) {
+      const halfWidth = track.scrollWidth / 2;
+      const duration = Math.max(15, halfWidth / 60);
+      track.style.setProperty('--ticker-duration', duration + 's');
+    }
+  });
+}
 </script>
 </body>
 </html>
