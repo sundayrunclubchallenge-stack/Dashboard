@@ -615,6 +615,9 @@ fetchDashboard().then(renderOverview).catch(err => {
   document.getElementById('heroSub').textContent = 'Could not load dashboard data — ' + err.message;
 });
 
+// Increment page view counter (fire-and-forget, no impact on page load)
+fetch(WEBAPP_URL, { method: 'POST' }).catch(() => {});
+
 window.addEventListener('dashboardFreshData', e => renderOverview(e.detail));
 
 function renderTicker(data) {
