@@ -23,7 +23,21 @@ const TEAM_PALETTE = [
   { name: 'pink',  hex: '#C24B7C' },
 ];
 
+const TEAM_COLORS = {
+  'Dark Knight':     '#FF6B6B',  // soft red
+  'Trailblazers':   '#51CF66',  // mint green
+  'Mavericks':      '#339AF0',  // sky blue
+  'Avengers':       '#CC5DE8',  // lavender purple
+  'ApexForce':      '#FCC419',  // golden yellow
+  'Flying Gazelle': '#22B8CF',  // teal
+  'Dhurandhar':     '#FF922B',  // tangerine
+  'Not Assigned':   '#888888',  // grey
+  'Unassigned':     '#AAAAAA',  // light grey
+};
+
 function teamColor(teamName) {
+  if (TEAM_COLORS[teamName]) return TEAM_COLORS[teamName];
+  // fallback for any new teams not yet mapped
   let hash = 0;
   for (let i = 0; i < teamName.length; i++) hash = (hash * 31 + teamName.charCodeAt(i)) >>> 0;
   return TEAM_PALETTE[hash % TEAM_PALETTE.length].hex;
