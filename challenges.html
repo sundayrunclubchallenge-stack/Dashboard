@@ -172,7 +172,7 @@ function renderChallengeCard(ch) {
                   <td>${p.name}</td>
                   <td>${p.team}</td>
                   <td>${formatNumber(p.total_metric)}</td>
-                  <td>${p.daily_log.length}</td>
+                  <td>${new Set(p.daily_log.map(d => d.date)).size}</td>
                 </tr>
               `).join('')}
             </tbody>
