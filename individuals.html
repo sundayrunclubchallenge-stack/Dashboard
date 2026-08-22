@@ -88,6 +88,8 @@ let EVENT_INFO = null;
 let currentSort = 'total';
 let personalChart = null;
 let personalDonut = null;
+let _trendRange = null; // null = default (last 7 days), or { from: 'yyyy-MM-dd', to: 'yyyy-MM-dd' }
+let _trendSource = null; // { sportLabels, sportColorMap, sportByDate } for current profile
 
 fetchDashboard().then(data => {
   renderSyncBadge(document.getElementById('syncBadge'), data.generated_at);
@@ -240,7 +242,15 @@ function renderProfile(p) {
       <!-- Personal trend + sport donut -->
       <div class="profile-charts">
         <div class="profile-chart-box">
-          <div class="section-head" style="margin:20px 0 8px"><h2 style="font-size:18px">Points over time</h2></div>
+          <div class="section-head" style="margin:20px 0 8px;flex-wrap:wrap;gap:8px">
+            <h2 style="font-size:18px">Points over time</h2>
+            <div class="date-filter">
+              <input type="date" class="filter-date" id="trendDateFrom" title="From date">
+              <span style="font-size:12px;color:var(--ink-faint)">to</span>
+              <input type="date" class="filter-date" id="trendDateTo" title="To date">
+              <button class="filter-btn" id="trendDateReset" title="Reset to last 7 days">Reset</button>
+            </div>
+          </div>
           <div class="chart-wrap" style="height:200px"><canvas id="personalTrendChart"></canvas></div>
         </div>
         <div class="profile-chart-box">
@@ -278,7 +288,77 @@ function renderProfile(p) {
     sportByDate[sport][r.date] = (sportByDate[sport][r.date] || 0) + r.points;
   });
 
-  const trendDates = [...new Set(personDays.map(r => r.date))].sort();
+  // Stash the trend source data so the range dropdown can re-render just this chart
+  _trendSource = { sportLabels, sportColorMap, sportByDate };
+  renderTrendChart();
+
+  if (personalDonut) personalDonut.destroy();
+  if (sportLabels.length > 0) {
+    const donutCtx = document.getElementById('personalDonutChart').getContext('2d');
+    personalDonut = new Chart(donutCtx, {
+      type: 'doughnut',
+      data: {
+        labels: sportLabels,
+        datasets: [{
+          data: sportData,
+          backgroundColor: sportColors.slice(0, sportLabels.length),
+          borderWidth: 2,
+          borderColor: '#FFFFFF'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 11 } } } }
+      }
+    });
+  }
+
+  // Render personal heatmap
+  const heatmapEl = document.getElementById('personalHeatmap');
+  const startD = new Date(EVENT_INFO.start_date);
+  const today = new Date();
+  const heatDates = [];
+  for (let d = new Date(startD); d <= today; d.setDate(d.getDate() + 1)) {
+    heatDates.push(d.toISOString().slice(0, 10));
+  }
+  const personDateSet = new Set(personDates);
+  heatmapEl.innerHTML = '<div class="heatmap-grid">' + heatDates.map(d => {
+    const wasActive = personDateSet.has(d);
+    const dt = new Date(d);
+    const label = dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    return `<div class="heat-cell ${wasActive ? 'level-3' : 'level-0'}" title="${label}: ${wasActive ? '✓ Active' : '—'}"></div>`;
+  }).join('') + '</div>';
+
+  // Reflect the current range in the date inputs on each new profile
+  const dateFrom = document.getElementById('trendDateFrom');
+  const dateTo = document.getElementById('trendDateTo');
+  if (dateFrom && dateTo) {
+    dateFrom.value = _trendRange ? _trendRange.from : '';
+    dateTo.value = _trendRange ? _trendRange.to : '';
+  }
+}
+
+// Builds/rebuilds the "Points over time" chart from the stashed source data,
+// respecting the currently selected day range (trendRangeDays).
+function renderTrendChart() {
+  const canvas = document.getElementById('personalTrendChart');
+  if (!canvas || !_trendSource) return;
+  const { sportLabels, sportColorMap, sportByDate } = _trendSource;
+
+  // All dates this person has activity on, sorted ascending
+  const allDates = [...new Set(
+    sportLabels.flatMap(s => Object.keys(sportByDate[s] || {}))
+  )].sort();
+
+  // Apply the range: custom from/to if set, otherwise default to the last 7 active days
+  let trendDates;
+  if (_trendRange) {
+    trendDates = allDates.filter(d => d >= _trendRange.from && d <= _trendRange.to);
+  } else {
+    trendDates = allDates.slice(-7);
+  }
+
   const trendLabels = trendDates.map(d => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }));
 
   // Create one dataset per sport
@@ -290,7 +370,7 @@ function renderProfile(p) {
   }));
 
   if (personalChart) personalChart.destroy();
-  const trendCtx = document.getElementById('personalTrendChart').getContext('2d');
+  const trendCtx = canvas.getContext('2d');
   personalChart = new Chart(trendCtx, {
     type: 'bar',
     data: {
@@ -333,48 +413,33 @@ function renderProfile(p) {
       }
     }]
   });
-
-  if (personalDonut) personalDonut.destroy();
-  if (sportLabels.length > 0) {
-    const donutCtx = document.getElementById('personalDonutChart').getContext('2d');
-    personalDonut = new Chart(donutCtx, {
-      type: 'doughnut',
-      data: {
-        labels: sportLabels,
-        datasets: [{
-          data: sportData,
-          backgroundColor: sportColors.slice(0, sportLabels.length),
-          borderWidth: 2,
-          borderColor: '#FFFFFF'
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 11 } } } }
-      }
-    });
-  }
-
-  // Render personal heatmap
-  const heatmapEl = document.getElementById('personalHeatmap');
-  const startD = new Date(EVENT_INFO.start_date);
-  const today = new Date();
-  const heatDates = [];
-  for (let d = new Date(startD); d <= today; d.setDate(d.getDate() + 1)) {
-    heatDates.push(d.toISOString().slice(0, 10));
-  }
-  const personDateSet = new Set(personDates);
-  heatmapEl.innerHTML = '<div class="heatmap-grid">' + heatDates.map(d => {
-    const wasActive = personDateSet.has(d);
-    const dt = new Date(d);
-    const label = dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-    return `<div class="heat-cell ${wasActive ? 'level-3' : 'level-0'}" title="${label}: ${wasActive ? '✓ Active' : '—'}"></div>`;
-  }).join('') + '</div>';
-
-  // Fill progress bar
-  fillLaneBar(document.getElementById('profileLane'), progressPct);
 }
+
+// Date-range filter for the trend chart (delegated so it survives profile re-renders).
+// Both dates must be set to apply a custom range; otherwise it stays on the default (last 7 days).
+document.addEventListener('change', (e) => {
+  if (!e.target) return;
+  if (e.target.id === 'trendDateFrom' || e.target.id === 'trendDateTo') {
+    const from = document.getElementById('trendDateFrom').value;
+    const to = document.getElementById('trendDateTo').value;
+    if (from && to) {
+      // Guard against reversed inputs
+      _trendRange = from <= to ? { from, to } : { from: to, to: from };
+      renderTrendChart();
+    }
+  }
+});
+
+document.addEventListener('click', (e) => {
+  if (e.target && e.target.id === 'trendDateReset') {
+    _trendRange = null;
+    const dateFrom = document.getElementById('trendDateFrom');
+    const dateTo = document.getElementById('trendDateTo');
+    if (dateFrom) dateFrom.value = '';
+    if (dateTo) dateTo.value = '';
+    renderTrendChart();
+  }
+});
 
 function flameSvg(streak) {
   const intensity = Math.min(1, (streak || 0) / 100);

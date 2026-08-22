@@ -77,10 +77,27 @@ function renderChallenges(data) {
     return;
   }
 
-  container.innerHTML = challenges.map(ch => renderChallengeCard(ch)).join('');
+  // Live/upcoming challenges render full and sit on top; completed ones collapse to
+  // a compact summary stacked below. Within each group, newest (highest #) first.
+  const liveOrUpcoming = challenges.filter(ch => ch.status !== 'completed')
+    .sort((a, b) => (b.number || 0) - (a.number || 0));
+  const completed = challenges.filter(ch => ch.status === 'completed')
+    .sort((a, b) => (b.number || 0) - (a.number || 0));
+
+  const html =
+    liveOrUpcoming.map(ch => renderChallengeCard(ch)).join('') +
+    completed.map(ch => renderCompletedSummaryCard(ch)).join('');
+
+  container.innerHTML = html;
 }
 
+// Routes a full (live/upcoming) challenge card to the correct renderer by type.
 function renderChallengeCard(ch) {
+  if (ch.type === 'team_distance_challenge') return renderTeamDistanceCard(ch);
+  return renderStepChallengeCard(ch);
+}
+
+function renderStepChallengeCard(ch) {
   const now = new Date();
   const startD = new Date(ch.start_date + 'T00:00:00+05:30');
   const endD = new Date(ch.end_date + 'T23:59:59+05:30');
@@ -219,6 +236,211 @@ function renderChallengeCard(ch) {
       ${eligibleNote}
     </div>
   `;
+}
+
+// ── Wild Card #2 style: Team Distance Challenge (Run + Walk) ──
+function renderTeamDistanceCard(ch) {
+  const now = new Date();
+  const startD = new Date(ch.start_date + 'T00:00:00+05:30');
+  const endD = new Date(ch.end_date + 'T23:59:59+05:30');
+  const totalDays = Math.round((endD - startD) / 86400000) + 1;
+
+  // Status & countdown
+  let statusHtml = '';
+  let countdownHtml = '';
+  if (ch.status === 'upcoming') {
+    const daysUntil = Math.ceil((startD - now) / 86400000);
+    statusHtml = '<span class="wc-status wc-upcoming">Upcoming</span>';
+    countdownHtml = `<div class="wc-countdown">Starts in <strong>${daysUntil}</strong> day${daysUntil !== 1 ? 's' : ''}</div>`;
+  } else if (ch.status === 'active') {
+    const daysLeft = Math.max(0, Math.ceil((endD - now) / 86400000));
+    const daysPassed = Math.floor((now - startD) / 86400000) + 1;
+    statusHtml = '<span class="wc-status wc-active">Live Now</span>';
+    countdownHtml = `<div class="wc-countdown">Day <strong>${daysPassed}</strong> of ${totalDays} &mdash; <strong>${daysLeft}</strong> day${daysLeft !== 1 ? 's' : ''} left</div>`;
+  } else {
+    statusHtml = '<span class="wc-status wc-completed">Completed</span>';
+    countdownHtml = '';
+  }
+
+  const startLabel = new Date(ch.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  const endLabel = new Date(ch.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  const baseStartLabel = new Date(ch.baseline_start).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  const baseEndLabel = new Date(ch.baseline_end).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  const cap = ch.improvement_cap_pct;
+
+  // Rules
+  const rewardsStr = ch.rewards.map(r => `${r.label}: <strong>${r.points}</strong> Bonus Zing Points`).join(' &bull; ');
+  const rulesHtml = `
+    <div class="wc-rules">
+      <div class="wc-rule-item">
+        <span class="wc-rule-icon">🎯</span>
+        <div><strong>Objective</strong><br>Beat your OWN team's normal weekly Run + Walk distance. Highest % improvement wins — not the most kilometers.</div>
+      </div>
+      <div class="wc-rule-item">
+        <span class="wc-rule-icon">📊</span>
+        <div><strong>Baseline</strong><br>Each team's average weekly Run + Walk distance across Weeks 1–5 (${baseStartLabel} – ${baseEndLabel}).</div>
+      </div>
+      <div class="wc-rule-item">
+        <span class="wc-rule-icon">📱</span>
+        <div><strong>Logging</strong><br>Log Running and Walking as usual (in km). Both count toward your team's total.</div>
+      </div>
+      <div class="wc-rule-item">
+        <span class="wc-rule-icon">🧢</span>
+        <div><strong>Cap</strong><br>Improvement counts up to <strong>+${cap}%</strong> max. Going below baseline shows as a negative %.</div>
+      </div>
+      <div class="wc-rule-item">
+        <span class="wc-rule-icon">🏆</span>
+        <div><strong>Rewards</strong><br>${rewardsStr} (added to the team total).</div>
+      </div>
+    </div>
+  `;
+
+  const lb = ch.leaderboard || [];
+  const hasResults = lb.some(t => t.week6_km > 0);
+
+  // Podium — top 3 teams by improvement %
+  let podiumHtml = '';
+  const top3 = lb.slice(0, 3);
+  if (ch.status !== 'upcoming' && hasResults && top3.length > 0) {
+    const medals = ['wc-gold', 'wc-silver', 'wc-bronze'];
+    const icons = ['👑', '🥈', '🥉'];
+    podiumHtml = '<div class="wc-podium">' + top3.map((t, i) => `
+      <div class="wc-podium-card ${medals[i]}">
+        <div class="wc-podium-rank">${icons[i]}</div>
+        <div class="wc-podium-name">${t.team}</div>
+        <div class="wc-podium-team">${formatNumber(t.week6_km)} km vs ${formatNumber(t.baseline_km)} km base</div>
+        <div class="wc-podium-metric">${formatPct(t.improvement_pct)}</div>
+      </div>
+    `).join('') + '</div>';
+  }
+
+  // Full team leaderboard table
+  let leaderboardHtml = '';
+  if (ch.status !== 'upcoming' && lb.length > 0) {
+    leaderboardHtml = `
+      <div class="wc-lb-section">
+        <div class="section-head"><h2 style="font-size:18px">Team standings</h2><span class="hint">${lb.length} teams · ranked by % improvement</span></div>
+        <div class="panel" style="max-height:500px;overflow-y:auto">
+          <table class="member-table">
+            <thead><tr><th>Rank</th><th>Team</th><th>Baseline km/wk</th><th>Week 6 km</th><th>Improvement</th><th>Award</th></tr></thead>
+            <tbody>
+              ${lb.map(t => `
+                <tr${t.rank <= 3 ? ' style="font-weight:700"' : ''}>
+                  <td>${t.rank <= 3 ? ['🥇','🥈','🥉'][t.rank-1] : t.rank}</td>
+                  <td>${t.team}</td>
+                  <td>${formatNumber(t.baseline_km)}</td>
+                  <td>${formatNumber(t.week6_km)}</td>
+                  <td style="color:${t.improvement_pct >= 0 ? 'var(--turf-dark)' : '#991B1B'}">${formatPct(t.improvement_pct)}</td>
+                  <td>${t.award_points > 0 ? '+' + t.award_points + ' pts' : '—'}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } else if (ch.status === 'active') {
+    leaderboardHtml = `
+      <div class="wc-lb-section">
+        <div class="section-head"><h2 style="font-size:18px">Team standings</h2></div>
+        <div class="empty-state" style="padding:24px"><div class="big">No distance logged yet</div>Get your team running and walking!</div>
+      </div>
+    `;
+  }
+
+  const baselineNote = ch.baseline_frozen
+    ? ''
+    : `<div class="wc-eligible-note">Baselines shown are a live preview and will be locked in when the challenge starts.</div>`;
+
+  return `
+    <div class="wc-card" id="challenge-${ch.id}">
+      <div class="wc-card-header">
+        <div class="wc-card-title-row">
+          <div>
+            <div class="wc-card-eyebrow">Wild Card Challenge #${ch.number}</div>
+            <h2 class="wc-card-title">${ch.name}</h2>
+            <div class="wc-card-subtitle">${ch.subtitle}</div>
+          </div>
+          <div class="wc-card-meta">
+            ${statusHtml}
+            <div class="wc-dates">${startLabel} — ${endLabel}</div>
+          </div>
+        </div>
+        ${countdownHtml}
+      </div>
+
+      ${rulesHtml}
+      ${podiumHtml}
+      ${leaderboardHtml}
+      ${baselineNote}
+    </div>
+  `;
+}
+
+// ── Compact summary for COMPLETED challenges (any type) ──
+// Shows name, number, dates, Completed status, and the top-3 winners
+// with place + points awarded + metric.
+function renderCompletedSummaryCard(ch) {
+  const startLabel = new Date(ch.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  const endLabel = new Date(ch.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  const isTeam = ch.type === 'team_distance_challenge';
+  const lb = ch.leaderboard || [];
+
+  // Winners: teams for team-distance, individuals for step-style. Only those with a real result.
+  const winners = (isTeam
+    ? lb.filter(t => t.week6_km > 0)
+    : lb.filter(p => p.total_metric > 0)
+  ).slice(0, 3);
+
+  const rewardPoints = {}; // place -> points (for step-style, awards come from config rewards)
+  (ch.rewards || []).forEach(r => { rewardPoints[r.place] = r.points; });
+  const medals = ['🥇', '🥈', '🥉'];
+
+  let winnersHtml;
+  if (winners.length === 0) {
+    winnersHtml = '<div class="wc-summary-empty">No winners recorded.</div>';
+  } else {
+    winnersHtml = '<div class="wc-summary-winners">' + winners.map((w, i) => {
+      const name = isTeam ? w.team : w.name;
+      const sub = isTeam ? '' : `<span class="wc-summary-team">${w.team}</span>`;
+      const metric = isTeam
+        ? formatPct(w.improvement_pct)
+        : `${formatNumber(w.total_metric)} ${ch.metric_label.toLowerCase()}`;
+      // Points: team-distance carries award_points per entry; step-style uses config by place
+      const pts = isTeam ? (w.award_points || 0) : (rewardPoints[i + 1] || 0);
+      return `
+        <div class="wc-summary-row">
+          <span class="wc-summary-medal">${medals[i]}</span>
+          <span class="wc-summary-name">${name}${sub}</span>
+          <span class="wc-summary-metric">${metric}</span>
+          <span class="wc-summary-pts">+${pts} pts</span>
+        </div>
+      `;
+    }).join('') + '</div>';
+  }
+
+  return `
+    <div class="wc-card wc-card-compact" id="challenge-${ch.id}">
+      <div class="wc-summary-head">
+        <div>
+          <div class="wc-card-eyebrow" style="color:var(--ink-faint)">Wild Card Challenge #${ch.number}</div>
+          <h3 class="wc-summary-title">${ch.name}</h3>
+        </div>
+        <div class="wc-card-meta" style="text-align:right">
+          <span class="wc-status wc-completed">Completed</span>
+          <div class="wc-dates" style="color:var(--ink-faint)">${startLabel} — ${endLabel}</div>
+        </div>
+      </div>
+      ${winnersHtml}
+    </div>
+  `;
+}
+
+// Formats an improvement percentage with sign and 2 decimals, e.g. "+12.73%".
+function formatPct(v) {
+  const n = Number(v) || 0;
+  const sign = n > 0 ? '+' : '';
+  return sign + n.toFixed(2) + '%';
 }
 </script>
 </body>

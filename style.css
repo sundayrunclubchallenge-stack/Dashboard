@@ -661,3 +661,33 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;font-
 .wc-eligible-note{
   padding:12px 24px 24px;font-size:13px;color:var(--ink-faint);font-style:italic;text-align:center;
 }
+
+/* ---------- Wild Card: compact completed-challenge summary ---------- */
+.wc-card-compact{padding:18px 20px}
+.wc-summary-head{
+  display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;
+  margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line);
+}
+.wc-summary-title{font-family:var(--display);font-size:24px;letter-spacing:0.4px;margin:2px 0 0;color:var(--ink)}
+.wc-summary-head .wc-card-eyebrow{color:var(--ink-faint)}
+.wc-summary-winners{display:flex;flex-direction:column;gap:4px}
+.wc-summary-row{
+  display:flex;align-items:center;gap:12px;padding:8px 4px;
+  border-bottom:1px solid var(--line);
+}
+.wc-summary-row:last-child{border-bottom:none}
+.wc-summary-medal{font-size:20px;flex-shrink:0;width:26px;text-align:center}
+.wc-summary-name{
+  flex:1;min-width:0;font-weight:700;font-size:15px;
+  display:flex;flex-direction:column;
+}
+.wc-summary-name .wc-summary-team{font-weight:500;font-size:12px;color:var(--ink-faint)}
+.wc-summary-metric{font-family:var(--mono);font-size:13px;color:var(--ink-soft);white-space:nowrap}
+.wc-summary-pts{
+  font-family:var(--mono);font-size:14px;font-weight:700;color:var(--turf-dark);
+  white-space:nowrap;min-width:64px;text-align:right;
+}
+.wc-summary-empty{padding:16px;text-align:center;color:var(--ink-faint);font-size:13px}
+@media (max-width:520px){
+  .wc-summary-metric{display:none}
+}
