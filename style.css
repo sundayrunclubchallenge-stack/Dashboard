@@ -466,6 +466,8 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;font-
 .chart-wrap.chart-donut{height:280px}
 .chart-wrap.chart-wide{height:300px}
 .chart-footnote{font-size:11px;color:var(--ink-faint);margin:8px 0 0;font-style:italic}
+.chart-explainer{font-size:13px;color:var(--ink-soft);line-height:1.5;margin:0 0 16px;max-width:80ch}
+.chart-explainer strong{color:var(--ink)}
 
 /* ---------- Engagement ring ---------- */
 .engagement-ring-wrap{display:flex;flex-direction:column;align-items:center;padding:20px 0}

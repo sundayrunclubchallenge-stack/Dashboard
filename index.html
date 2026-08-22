@@ -123,16 +123,23 @@
     </div>
   </div>
 
-  <!-- Team race chart -->
+  <!-- Team sport mix chart -->
   <div class="wrap" style="margin-bottom:32px">
     <div class="panel">
       <div class="section-head">
-        <h2>Team race</h2>
-        <span class="hint">cumulative points over time</span>
+        <h2>Team sport mix (points)</h2>
+        <span class="hint">what each team earns points from</span>
       </div>
+      <p class="chart-explainer">
+        Each bar is a team's total points, broken down by sport. We show the 5 most-played
+        sports across the whole event as coloured segments, group the rest into <strong>Other</strong>,
+        and add each team's <strong>Bonus</strong> points (streaks, variety &amp; team awards) at the end.
+        Tip: click a sport in the legend to see just that sport across all teams.
+      </p>
       <div class="chart-wrap chart-wide">
-        <canvas id="teamRaceChart"></canvas>
+        <canvas id="teamSportMixChart"></canvas>
       </div>
+      <p class="chart-footnote">* Sport segments are activity points; the Bonus segment isn't tied to a sport. Bars total each team's overall points.</p>
     </div>
   </div>
 
@@ -207,6 +214,31 @@
 markActiveNav('overview');
 
 let trendChart, donutChart, raceChart, dailyPointsChart;
+
+// Legend click behaviour: ISOLATE instead of the default toggle-off.
+// - Default view shows all teams.
+// - Clicking a team hides the rest and shows only that team.
+// - Clicking the already-isolated team again restores all teams.
+function isolateLegendOnClick(e, legendItem, legend) {
+  const chart = legend.chart;
+  const clicked = legendItem.datasetIndex;
+  const total = chart.data.datasets.length;
+
+  const visibleIdx = [];
+  for (let i = 0; i < total; i++) {
+    if (chart.isDatasetVisible(i)) visibleIdx.push(i);
+  }
+  const isOnlyClickedVisible = visibleIdx.length === 1 && visibleIdx[0] === clicked;
+
+  if (isOnlyClickedVisible) {
+    // Already isolated → restore all teams
+    for (let i = 0; i < total; i++) chart.setDatasetVisibility(i, true);
+  } else {
+    // Isolate the clicked team → hide everyone else
+    for (let i = 0; i < total; i++) chart.setDatasetVisibility(i, i === clicked);
+  }
+  chart.update();
+}
 
 function renderOverview(data) {
   renderTicker(data);
@@ -391,7 +423,7 @@ function renderOverview(data) {
     }]
   });
 
-  // ─── Team race chart ───
+  // ─── Shared team/date aggregation (used by this chart + Daily points below) ───
   const teamDailyPts = {}; // team -> { date -> points }
   dailyBreakdown.forEach(r => {
     if (!teamDailyPts[r.team]) teamDailyPts[r.team] = {};
@@ -399,39 +431,117 @@ function renderOverview(data) {
   });
   const allDates = [...new Set(dailyBreakdown.map(r => r.date))].sort();
   const teamNames = Object.keys(teamDailyPts);
-  const raceDatasets = teamNames.map((team, idx) => {
-    let cumulative = 0;
-    const cumulativeData = allDates.map(d => {
-      cumulative += (teamDailyPts[team][d] || 0);
-      return cumulative;
-    });
-    return {
-      label: team,
-      data: cumulativeData,
-      borderColor: TEAM_PALETTE[idx % TEAM_PALETTE.length].hex,
-      backgroundColor: 'transparent',
-      tension: 0.3,
-      pointRadius: allDates.length > 30 ? 0 : 3,
-      borderWidth: 2.5
-    };
+
+  // ─── Team sport mix (stacked bar: top-5 sports + Other + Bonus, per team) ───
+  // Aggregate activity points per team per sport, and find the global top 5 sports.
+  const teamSportPts = {};   // team -> { sport -> activity points }
+  const globalSportPts = {}; // sport -> total activity points (for ranking)
+  dailyBreakdown.forEach(r => {
+    const sport = r.sport || 'Other';
+    if (!teamSportPts[r.team]) teamSportPts[r.team] = {};
+    teamSportPts[r.team][sport] = (teamSportPts[r.team][sport] || 0) + r.points;
+    globalSportPts[sport] = (globalSportPts[sport] || 0) + r.points;
   });
 
-  const raceLabels = allDates.map(d => { const dt = new Date(d); return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }); });
+  const TOP_SPORTS_N = 5;
+  const topSports = Object.keys(globalSportPts)
+    .sort((a, b) => globalSportPts[b] - globalSportPts[a])
+    .slice(0, TOP_SPORTS_N);
+  const topSportsSet = new Set(topSports);
+
+  // Teams sorted by overall total points (leaderboard order),
+  // excluding the placeholder "Unassigned" / "Not Assigned" buckets.
+  const EXCLUDED_TEAMS = new Set(['unassigned', 'not assigned']);
+  const mixTeams = [...teams]
+    .filter(t => !EXCLUDED_TEAMS.has(String(t.name || '').trim().toLowerCase()))
+    .sort((a, b) => b.total_points - a.total_points);
+  const mixTeamNames = mixTeams.map(t => t.name);
+
+  // Segment palette: one fixed colour per top sport, plus Other and Bonus.
+  const SPORT_MIX_COLORS = ['#F97316', '#10B981', '#3B82F6', '#FBBF24', '#6B4FA0'];
+  const OTHER_COLOR = '#9CA3AF';
+  const BONUS_COLOR = '#111827';
+
+  // One dataset (stack segment) per top sport, then Other, then Bonus.
+  const sportMixDatasets = topSports.map((sport, i) => ({
+    label: sport,
+    data: mixTeamNames.map(name => Math.round((teamSportPts[name] || {})[sport] || 0)),
+    backgroundColor: SPORT_MIX_COLORS[i % SPORT_MIX_COLORS.length],
+    borderWidth: 1,
+    borderColor: '#fff'
+  }));
+
+  // "Other" = all non-top-5 sports summed per team
+  sportMixDatasets.push({
+    label: 'Other',
+    data: mixTeamNames.map(name => {
+      const sp = teamSportPts[name] || {};
+      let other = 0;
+      Object.keys(sp).forEach(s => { if (!topSportsSet.has(s)) other += sp[s]; });
+      return Math.round(other);
+    }),
+    backgroundColor: OTHER_COLOR,
+    borderWidth: 1,
+    borderColor: '#fff'
+  });
+
+  // "Bonus" = team bonus points (not sport-tied), from the teams array
+  sportMixDatasets.push({
+    label: 'Bonus',
+    data: mixTeams.map(t => Math.round(t.bonus_points || 0)),
+    backgroundColor: BONUS_COLOR,
+    borderWidth: 1,
+    borderColor: '#fff'
+  });
 
   if (raceChart) raceChart.destroy();
-  const raceCtx = document.getElementById('teamRaceChart').getContext('2d');
-  raceChart = new Chart(raceCtx, {
-    type: 'line',
-    data: { labels: raceLabels, datasets: raceDatasets },
+  const sportMixCtx = document.getElementById('teamSportMixChart').getContext('2d');
+  raceChart = new Chart(sportMixCtx, {
+    type: 'bar',
+    data: { labels: mixTeamNames, datasets: sportMixDatasets },
     options: {
+      indexAxis: 'y', // horizontal bars
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12, font: { size: 12 } } } },
+      layout: { padding: { right: 56 } }, // room for the total label at the end of each bar
+      plugins: {
+        legend: { position: 'bottom', onClick: isolateLegendOnClick, labels: { boxWidth: 12, padding: 12, font: { size: 12 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${formatNumber(ctx.parsed.x)} pts`
+          }
+        }
+      },
       scales: {
-        x: { grid: { display: false } },
-        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }
+        x: { stacked: true, beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { callback: v => formatNumber(v) } },
+        y: { stacked: true, grid: { display: false }, ticks: { font: { size: 12, weight: '600' } } }
       }
-    }
+    },
+    plugins: [{
+      // Draws each team's grand total at the end of its stacked bar.
+      id: 'stackedBarTotals',
+      afterDatasetsDraw(chart) {
+        const ctx2 = chart.ctx;
+        const lastVisible = chart.data.datasets
+          .map((_, i) => i)
+          .filter(i => chart.isDatasetVisible(i));
+        if (!lastVisible.length) return;
+        const lastIdx = lastVisible[lastVisible.length - 1];
+        const lastMeta = chart.getDatasetMeta(lastIdx);
+
+        lastMeta.data.forEach((bar, i) => {
+          // Sum only visible segments so the total matches what's drawn
+          let total = 0;
+          lastVisible.forEach(dsIdx => { total += chart.data.datasets[dsIdx].data[i] || 0; });
+          if (total <= 0) return;
+          ctx2.fillStyle = '#111827';
+          ctx2.font = 'bold 12px Manrope';
+          ctx2.textAlign = 'left';
+          ctx2.textBaseline = 'middle';
+          ctx2.fillText(formatNumber(total), bar.x + 8, bar.y);
+        });
+      }
+    }]
   });
 
   // ─── Daily points by team (last 7 days, non-cumulative) ───
@@ -459,7 +569,7 @@ function renderOverview(data) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12, font: { size: 12 } } } },
+      plugins: { legend: { position: 'bottom', onClick: isolateLegendOnClick, labels: { boxWidth: 12, padding: 12, font: { size: 12 } } } },
       scales: {
         x: { grid: { display: false } },
         y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }
