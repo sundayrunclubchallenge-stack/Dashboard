@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SRC 100 Day Challenge — Wild Card Challenges</title>
 <link rel="stylesheet" href="style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
 </head>
 <body>
 
@@ -22,6 +25,7 @@
       <li><a href="sports.html" data-page="sports">Sports</a></li>
       <li><a href="challenges.html" data-page="challenges">Challenges</a></li>
     </ul>
+    <a class="log-cta" href="https://sundayrunclubchallenge-stack.github.io/Activity-logging/" target="_blank" rel="noopener">+ Log activity</a>
     <span class="sync-badge" id="syncBadge"></span>
   </div>
 </nav>
@@ -68,6 +72,11 @@ fetchDashboard().then(data => {
 
 window.addEventListener('dashboardFreshData', e => renderChallenges(e.detail));
 
+// Increment page view counter — fire after load settles.
+const fireViewCounter = () => fetch(WEBAPP_URL, { method: 'POST' }).catch(() => {});
+if ('requestIdleCallback' in window) requestIdleCallback(fireViewCounter, { timeout: 3000 });
+else setTimeout(fireViewCounter, 1500);
+
 function renderChallenges(data) {
   const challenges = data.wild_card_challenges || [];
   const container = document.getElementById('challengesContent');
@@ -98,7 +107,7 @@ function renderChallengeCard(ch) {
 }
 
 function renderStepChallengeCard(ch) {
-  const now = new Date();
+  const now = nowIST();
   const startD = new Date(ch.start_date + 'T00:00:00+05:30');
   const endD = new Date(ch.end_date + 'T23:59:59+05:30');
 
@@ -240,7 +249,7 @@ function renderStepChallengeCard(ch) {
 
 // ── Wild Card #2 style: Team Distance Challenge (Run + Walk) ──
 function renderTeamDistanceCard(ch) {
-  const now = new Date();
+  const now = nowIST();
   const startD = new Date(ch.start_date + 'T00:00:00+05:30');
   const endD = new Date(ch.end_date + 'T23:59:59+05:30');
   const totalDays = Math.round((endD - startD) / 86400000) + 1;

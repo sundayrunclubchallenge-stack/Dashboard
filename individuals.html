@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SRC 100 Day Challenge — Individual Module</title>
 <link rel="stylesheet" href="style.css">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
 </head>
 <body>
 
@@ -23,6 +25,7 @@
       <li><a href="sports.html" data-page="sports">Sports</a></li>
       <li><a href="challenges.html" data-page="challenges">Challenges</a></li>
     </ul>
+    <a class="log-cta" href="https://sundayrunclubchallenge-stack.github.io/Activity-logging/" target="_blank" rel="noopener">+ Log activity</a>
     <span class="sync-badge" id="syncBadge"></span>
   </div>
 </nav>
@@ -78,6 +81,7 @@
   <span>Fetching latest data…</span>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="dashboard.js"></script>
 <script>
 markActiveNav('individuals');
@@ -128,7 +132,14 @@ const searchResults = document.getElementById('searchResults');
 searchInput.addEventListener('input', () => {
   const q = searchInput.value.trim().toLowerCase();
   if (!q) { searchResults.classList.remove('open'); return; }
-  const matches = ALL_PARTICIPANTS.filter(p => p.name.toLowerCase().includes(q)).slice(0, 8);
+  const matches = ALL_PARTICIPANTS
+    .filter(p => p.name.toLowerCase().includes(q))
+    .sort((a, b) => {
+      const aStart = a.name.toLowerCase().startsWith(q) ? 0 : 1;
+      const bStart = b.name.toLowerCase().startsWith(q) ? 0 : 1;
+      return aStart - bStart || a.name.localeCompare(b.name);
+    })
+    .slice(0, 12);
   if (!matches.length) { searchResults.classList.remove('open'); return; }
   searchResults.innerHTML = matches.map(p => `
     <div class="opt" data-name="${p.name}">
@@ -147,6 +158,8 @@ searchResults.addEventListener('click', (e) => {
     renderProfile(match);
     searchInput.value = match.name;
     searchResults.classList.remove('open');
+    // Keep the view on the profile panel instead of jumping to the top.
+    document.getElementById('profilePanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 });
 
@@ -159,6 +172,13 @@ function emptyProfileHtml() {
 }
 
 function renderProfile(p) {
+  // The profile panel HTML (including the <canvas> nodes) is rebuilt on each
+  // call. Chart.js instances hold a reference to the OLD canvas, so without
+  // destroying them first, the new canvases never receive a chart.
+  if (personalChart) { personalChart.destroy(); personalChart = null; }
+  if (personalDonut) { personalDonut.destroy(); personalDonut = null; }
+  _trendSource = null;
+
   const color = teamColor(p.team);
   const progressPct = EVENT_INFO ? Math.round((p.streak / EVENT_INFO.total_days) * 100) : 0;
 
@@ -292,16 +312,15 @@ function renderProfile(p) {
   _trendSource = { sportLabels, sportColorMap, sportByDate };
   renderTrendChart();
 
-  if (personalDonut) personalDonut.destroy();
-  if (sportLabels.length > 0) {
+  if (!personalDonut && sportLabels.length > 0) {
     const donutCtx = document.getElementById('personalDonutChart').getContext('2d');
     personalDonut = new Chart(donutCtx, {
       type: 'doughnut',
       data: {
-        labels: sportLabels,
+        labels: [],
         datasets: [{
-          data: sportData,
-          backgroundColor: sportColors.slice(0, sportLabels.length),
+          data: [],
+          backgroundColor: sportColors,
           borderWidth: 2,
           borderColor: '#FFFFFF'
         }]
@@ -309,18 +328,31 @@ function renderProfile(p) {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 11 } } } }
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 11 } } }
+        }
       }
     });
   }
 
-  // Render personal heatmap
+  // Update donut data (create or update)
+  if (personalDonut) {
+    personalDonut.data.labels = sportLabels;
+    personalDonut.data.datasets[0].data = sportData;
+    personalDonut.data.datasets[0].backgroundColor = sportColors.slice(0, sportLabels.length);
+    personalDonut.update();
+  }
+
+  // Render personal heatmap (local-date loop to avoid UTC shift)
   const heatmapEl = document.getElementById('personalHeatmap');
   const startD = new Date(EVENT_INFO.start_date);
   const today = new Date();
   const heatDates = [];
-  for (let d = new Date(startD); d <= today; d.setDate(d.getDate() + 1)) {
-    heatDates.push(d.toISOString().slice(0, 10));
+  for (let d = new Date(startD.getFullYear(), startD.getMonth(), startD.getDate());
+       d <= today; d.setDate(d.getDate() + 1)) {
+    heatDates.push(d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0'));
   }
   const personDateSet = new Set(personDates);
   heatmapEl.innerHTML = '<div class="heatmap-grid">' + heatDates.map(d => {
@@ -361,58 +393,67 @@ function renderTrendChart() {
 
   const trendLabels = trendDates.map(d => new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }));
 
-  // Create one dataset per sport
-  const trendDatasets = sportLabels.map(sport => ({
+  // Only include sports that have at least one day with activity in the
+  // selected range — keeps the legend in sync with what's actually shown.
+  const visibleSports = sportLabels.filter(sport => {
+    const entries = sportByDate[sport] || {};
+    return trendDates.some(d => entries[d]);
+  });
+
+  // Create one dataset per visible sport
+  const trendDatasets = visibleSports.map(sport => ({
     label: sport,
     data: trendDates.map(d => (sportByDate[sport] && sportByDate[sport][d]) || 0),
     backgroundColor: sportColorMap[sport],
     borderRadius: 4,
   }));
 
-  if (personalChart) personalChart.destroy();
-  const trendCtx = canvas.getContext('2d');
-  personalChart = new Chart(trendCtx, {
-    type: 'bar',
-    data: {
-      labels: trendLabels,
-      datasets: trendDatasets
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      layout: { padding: { top: 24 } },
-      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 11 } } } },
-      scales: {
-        x: { stacked: true, grid: { display: false } },
-        y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }
-      }
-    },
-    plugins: [{
-      id: 'stackedBarTotals',
-      afterDatasetsDraw(chart) {
-        const ctx2 = chart.ctx;
-        const datasets = chart.data.datasets;
-        const meta0 = chart.getDatasetMeta(0);
-        meta0.data.forEach((bar, i) => {
-          let total = 0;
-          datasets.forEach(ds => { total += ds.data[i] || 0; });
-          // Find the top of the stacked bar (last visible dataset)
-          let topY = bar.y;
-          for (let d = datasets.length - 1; d >= 0; d--) {
-            const meta = chart.getDatasetMeta(d);
-            if (!meta.hidden && meta.data[i]) {
-              topY = meta.data[i].y;
-              break;
-            }
-          }
-          ctx2.fillStyle = '#111827';
-          ctx2.font = 'bold 11px Manrope';
-          ctx2.textAlign = 'center';
-          ctx2.fillText(formatNumber(total), bar.x, topY - 6);
-        });
-      }
-    }]
-  });
+  if (!personalChart) {
+    const trendCtx = canvas.getContext('2d');
+    personalChart = new Chart(trendCtx, {
+      type: 'bar',
+      data: {
+        labels: [],
+        datasets: []
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { top: 24 } },
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, padding: 8, font: { size: 11 } } } },
+        scales: {
+          x: { stacked: true, grid: { display: false } },
+          y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }
+        }
+      },
+      plugins: [{
+        id: 'stackedBarTotals',
+        afterDatasetsDraw(chart) {
+          const ctx2 = chart.ctx;
+          const datasets = chart.data.datasets;
+          // Find the last visible dataset (top of stack)
+          const lastVisibleIdx = [...datasets.keys()]
+            .reverse()
+            .find(i => !chart.getDatasetMeta(i).hidden);
+          if (lastVisibleIdx === undefined) return;
+          const meta = chart.getDatasetMeta(lastVisibleIdx);
+          meta.data.forEach((bar, i) => {
+            let total = 0;
+            datasets.forEach(ds => { total += ds.data[i] || 0; });
+            ctx2.fillStyle = '#111827';
+            ctx2.font = 'bold 11px Manrope';
+            ctx2.textAlign = 'center';
+            ctx2.fillText(formatNumber(total), bar.x, bar.y - 6);
+          });
+        }
+      }]
+    });
+  }
+
+  // Update trend chart data (create or update)
+  personalChart.data.labels = trendLabels;
+  personalChart.data.datasets = trendDatasets;
+  personalChart.update();
 }
 
 // Date-range filter for the trend chart (delegated so it survives profile re-renders).
@@ -470,7 +511,8 @@ function renderLeaderboard() {
       const p = ALL_PARTICIPANTS.find(x => x.name === row.dataset.name);
       if (p) {
         renderProfile(p);
-        window.scrollTo({ top: 0, behavior: REDUCED_MOTION ? 'auto' : 'smooth' });
+        // Keep the view on the profile panel instead of jumping to the top.
+        document.getElementById('profilePanel').scrollIntoView({ behavior: REDUCED_MOTION ? 'auto' : 'smooth', block: 'start' });
       }
     });
   });

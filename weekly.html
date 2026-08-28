@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SRC 100 Day Challenge — Weekly Recap</title>
 <link rel="stylesheet" href="style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
 </head>
 <body>
 
@@ -22,6 +25,7 @@
       <li><a href="sports.html" data-page="sports">Sports</a></li>
       <li><a href="challenges.html" data-page="challenges">Challenges</a></li>
     </ul>
+    <a class="log-cta" href="https://sundayrunclubchallenge-stack.github.io/Activity-logging/" target="_blank" rel="noopener">+ Log activity</a>
     <span class="sync-badge" id="syncBadge"></span>
   </div>
 </nav>
@@ -85,8 +89,8 @@ function getWeeks() {
     const isCurrentWeek = today >= weekStart && today <= weekEnd;
     weeks.push({
       num: weekNum,
-      start: weekStart.toISOString().slice(0, 10),
-      end: weekEnd.toISOString().slice(0, 10),
+      start: localDateStr(weekStart),
+      end: localDateStr(weekEnd),
       startLabel: weekStart.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
       endLabel: weekEnd.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
       isCurrent: isCurrentWeek

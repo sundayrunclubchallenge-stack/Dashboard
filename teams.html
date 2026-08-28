@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SRC 100 Day Challenge — Team Module</title>
 <link rel="stylesheet" href="style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -23,6 +26,7 @@
       <li><a href="sports.html" data-page="sports">Sports</a></li>
       <li><a href="challenges.html" data-page="challenges">Challenges</a></li>
     </ul>
+    <a class="log-cta" href="https://sundayrunclubchallenge-stack.github.io/Activity-logging/" target="_blank" rel="noopener">+ Log activity</a>
     <span class="sync-badge" id="syncBadge"></span>
   </div>
 </nav>
@@ -201,7 +205,7 @@ function setupDateFilter() {
         const to = new Date();
         const from = new Date();
         from.setDate(from.getDate() - days);
-        _lbDateRange = { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+        _lbDateRange = { from: localDateStr(from), to: localDateStr(to) };
       }
       renderTeamsView(_fullData, _lbDateRange);
     });
@@ -325,7 +329,7 @@ function showTeamDetail(teamName, participants, data) {
   } else {
     const weekStart = new Date(now);
     weekStart.setDate(weekStart.getDate() - 7);
-    participateFrom = weekStart.toISOString().slice(0, 10);
+    participateFrom = localDateStr(weekStart);
     participateLabel = 'active this week';
   }
   const activeInRange = new Set(teamBreakdown.filter(r => r.date >= participateFrom).map(r => r.name));
@@ -347,17 +351,24 @@ function showTeamDetail(teamName, participants, data) {
   const sportData = sportLabels.map(s => sportCounts[s]);
   const sportColors = ['#E2542F', '#2F7A4F', '#2C6E9E', '#F2A93B', '#6B4FA0', '#C24B7C', '#1F5636', '#B23F20'];
 
-  if (teamSportChart) teamSportChart.destroy();
-  if (sportLabels.length > 0) {
+  if (!teamSportChart) {
     const ctx = document.getElementById('teamSportDonut').getContext('2d');
     teamSportChart = new Chart(ctx, {
       type: 'doughnut',
       data: {
-        labels: sportLabels,
-        datasets: [{ data: sportData, backgroundColor: sportColors.slice(0, sportLabels.length), borderWidth: 2, borderColor: '#fff' }]
+        labels: [],
+        datasets: [{ data: [], backgroundColor: sportColors, borderWidth: 2, borderColor: '#fff' }]
       },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } } }
     });
+  }
+
+  // Update donut data (create or update)
+  if (teamSportChart) {
+    teamSportChart.data.labels = sportLabels;
+    teamSportChart.data.datasets[0].data = sportData;
+    teamSportChart.data.datasets[0].backgroundColor = sportColors.slice(0, sportLabels.length);
+    teamSportChart.update();
   }
 
   // ─── Weekly momentum (event weeks: Week 1 = Jul 20–26, Week 2 = Jul 27–Aug 2, etc.) ───
@@ -384,74 +395,80 @@ function showTeamDetail(teamName, participants, data) {
     weekData.push(weekPoints[w] || 0);
   }
 
-  if (teamMomentumChart) teamMomentumChart.destroy();
-  const momCtx = document.getElementById('teamMomentumChart').getContext('2d');
-  teamMomentumChart = new Chart(momCtx, {
-    type: 'bar',
-    data: {
-      labels: weekLabels,
-      datasets: [{
-        data: weekData,
-        backgroundColor: weekLabels.map((_, i) => i === weekLabels.length - 1 ? teamColor(teamName) : teamColor(teamName) + '80'),
-        borderRadius: 6,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } } }
-    }
-  });
+  if (!teamMomentumChart) {
+    const momCtx = document.getElementById('teamMomentumChart').getContext('2d');
+    teamMomentumChart = new Chart(momCtx, {
+      type: 'bar',
+      data: {
+        labels: [],
+        datasets: [{ data: [], backgroundColor: [], borderRadius: 6 }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } } }
+      }
+    });
+  }
+
+  // Update momentum chart data (create or update)
+  // Recolor last week (highlight current) on every update
+  teamMomentumChart.data.labels = weekLabels;
+  teamMomentumChart.data.datasets[0].data = weekData;
+  teamMomentumChart.data.datasets[0].backgroundColor = weekLabels.map((_, i) =>
+    i === weekLabels.length - 1 ? teamColor(teamName) : teamColor(teamName) + '80');
+  teamMomentumChart.update();
 
   // ─── Member contribution (horizontal stacked bar) ───
-  if (memberContribChart) memberContribChart.destroy();
+  if (!memberContribChart) {
+    const contribCtx = document.getElementById('memberContribChart').getContext('2d');
+    memberContribChart = new Chart(contribCtx, {
+      type: 'bar',
+      data: {
+        labels: [],
+        datasets: [{ label: 'Points', data: [], backgroundColor: [], borderRadius: 4 }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { right: 40 } },
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+          y: { grid: { display: false }, ticks: { font: { size: 12, weight: '600' }, padding: 4 } }
+        }
+      },
+      plugins: [{
+        id: 'barValueLabels',
+        afterDatasetsDraw(chart) {
+          const ctx2 = chart.ctx;
+          chart.getDatasetMeta(0).data.forEach((bar, i) => {
+            const val = chart.data.datasets[0].data[i];
+            ctx2.fillStyle = '#111827';
+            ctx2.font = 'bold 11px Manrope';
+            ctx2.textAlign = 'left';
+            ctx2.textBaseline = 'middle';
+            ctx2.fillText(formatNumber(val), bar.x + 6, bar.y);
+          });
+        }
+      }]
+    });
+  }
+
+  // Update member contribution chart data (create or update)
   const memberNames = displayMembers.map(m => m.name);
   const memberPts = displayMembers.map(m => m.total_points);
+  memberContribChart.data.labels = memberNames;
+  memberContribChart.data.datasets[0].data = memberPts;
+  memberContribChart.data.datasets[0].backgroundColor = memberNames.map((_, i) => sportColors[i % sportColors.length]);
+  memberContribChart.update();
 
   // Dynamic height: 40px per member, minimum 200px
   const dynamicHeight = Math.max(200, memberNames.length * 40);
   const contribWrap = document.getElementById('memberContribWrap');
   contribWrap.style.height = dynamicHeight + 'px';
-
-  const contribCtx = document.getElementById('memberContribChart').getContext('2d');
-  memberContribChart = new Chart(contribCtx, {
-    type: 'bar',
-    data: {
-      labels: memberNames,
-      datasets: [{
-        label: 'Points',
-        data: memberPts,
-        backgroundColor: memberNames.map((_, i) => sportColors[i % sportColors.length]),
-        borderRadius: 4,
-      }]
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true,
-      maintainAspectRatio: false,
-      layout: { padding: { right: 40 } },
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
-        y: { grid: { display: false }, ticks: { font: { size: 12, weight: '600' }, padding: 4 } }
-      }
-    },
-    plugins: [{
-      id: 'barValueLabels',
-      afterDatasetsDraw(chart) {
-        const ctx2 = chart.ctx;
-        chart.getDatasetMeta(0).data.forEach((bar, i) => {
-          const val = chart.data.datasets[0].data[i];
-          ctx2.fillStyle = '#111827';
-          ctx2.font = 'bold 11px Manrope';
-          ctx2.textAlign = 'left';
-          ctx2.textBaseline = 'middle';
-          ctx2.fillText(formatNumber(val), bar.x + 6, bar.y);
-        });
-      }
-    }]
-  });
 
   // ─── Member table ───
   document.getElementById('detailBody').innerHTML = displayMembers.map((p, i) => `
@@ -507,7 +524,7 @@ function setupDetailDateFilter() {
         const to = new Date();
         const from = new Date();
         from.setDate(from.getDate() - days);
-        _detailDateRange = { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+        _detailDateRange = { from: localDateStr(from), to: localDateStr(to) };
       }
       if (_currentTeam && _fullData) {
         showTeamDetail(_currentTeam, _fullData.participants, _fullData);

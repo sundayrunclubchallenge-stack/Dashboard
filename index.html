@@ -5,8 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SRC 100 Day Challenge — Event Overview</title>
 <link rel="stylesheet" href="style.css">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
 </head>
 <body>
 
@@ -24,6 +25,7 @@
       <li><a href="sports.html" data-page="sports">Sports</a></li>
       <li><a href="challenges.html" data-page="challenges">Challenges</a></li>
     </ul>
+    <a class="log-cta" href="https://sundayrunclubchallenge-stack.github.io/Activity-logging/" target="_blank" rel="noopener">+ Log activity</a>
     <span class="sync-badge" id="syncBadge"></span>
   </div>
 </nav>
@@ -35,36 +37,36 @@
 
 <header class="hero">
   <div class="wrap">
-    <p class="eyebrow animate-fade-up" style="animation-delay:0.1s">Event overview</p>
-    <h1 id="dayHeadline" class="animate-fade-up" style="animation-delay:0.2s">Day — / —</h1>
-    <p class="sub animate-fade-up" style="animation-delay:0.3s" id="heroSub">Loading today's numbers from the challenge sheet…</p>
+    <p class="eyebrow animate-fade-up delay-1">Event overview</p>
+    <h1 id="dayHeadline" class="animate-fade-up delay-2">Day — / —</h1>
+    <p class="sub animate-fade-up delay-3" id="heroSub">Loading today's numbers from the challenge sheet…</p>
 
-    <div class="lane-bar animate-fade-up" style="animation-delay:0.4s" id="dayLaneBar"><div class="lane-fill"></div></div>
-    <div class="lane-caption animate-fade-in" style="animation-delay:0.5s">
+    <div class="lane-bar animate-fade-up delay-4" id="dayLaneBar"><div class="lane-fill"></div></div>
+    <div class="lane-caption animate-fade-in delay-5">
       <span id="laneStart">Day 0</span>
       <span id="laneEnd">Day 100</span>
     </div>
 
     <div class="stat-grid">
-      <div class="stat-card coral animate-scale-in" style="animation-delay:0.5s">
+      <div class="stat-card coral animate-scale-in delay-5">
         <div class="num countup" id="statParticipants">0</div>
         <div class="label">Participants</div>
       </div>
-      <div class="stat-card turf animate-scale-in" style="animation-delay:0.65s">
+      <div class="stat-card turf animate-scale-in delay-6">
         <div class="num countup" id="statPoints">0</div>
         <div class="label">Total points</div>
       </div>
-      <div class="stat-card flag animate-scale-in glow-active" style="animation-delay:0.8s">
+      <div class="stat-card flag animate-scale-in glow-active delay-7">
         <div class="num countup" id="statActive">0</div>
         <div class="label">Active today</div>
       </div>
-      <div class="stat-card pool animate-scale-in" style="animation-delay:0.95s">
+      <div class="stat-card pool animate-scale-in delay-8">
         <div class="num countup" id="statRemaining">0</div>
         <div class="label">Days remaining</div>
       </div>
     </div>
 
-    <p class="tagline animate-fade-in" style="animation-delay:1.2s" id="tagline"></p>
+    <p class="tagline animate-fade-in delay-9" id="tagline"></p>
   </div>
 </header>
 
@@ -107,7 +109,7 @@
         <h2>Daily activity trend</h2>
       </div>
       <div class="chart-wrap">
-        <canvas id="dailyTrendChart"></canvas>
+        <canvas id="dailyTrendChart" role="img" aria-label="Bar chart of participants per day over the last 7 days"></canvas>
       </div>
       <p class="chart-footnote">* Count of participants per day in last 7 days</p>
     </div>
@@ -117,7 +119,7 @@
         <h2>Sport breakdown</h2>
       </div>
       <div class="chart-wrap chart-donut">
-        <canvas id="sportDonutChart"></canvas>
+        <canvas id="sportDonutChart" role="img" aria-label="Donut chart of sports played till date"></canvas>
       </div>
       <p class="chart-footnote">* This displays count of sport played till date</p>
     </div>
@@ -137,7 +139,7 @@
         Tip: click a sport in the legend to see just that sport across all teams.
       </p>
       <div class="chart-wrap chart-wide">
-        <canvas id="teamSportMixChart"></canvas>
+        <canvas id="teamSportMixChart" role="img" aria-label="Stacked horizontal bar chart of team points by sport"></canvas>
       </div>
       <p class="chart-footnote">* Sport segments are activity points; the Bonus segment isn't tied to a sport. Bars total each team's overall points.</p>
     </div>
@@ -151,7 +153,7 @@
         <span class="hint">last 7 days</span>
       </div>
       <div class="chart-wrap chart-wide">
-        <canvas id="dailyPointsChart"></canvas>
+        <canvas id="dailyPointsChart" role="img" aria-label="Line chart of daily points by team over the last 7 days"></canvas>
       </div>
     </div>
   </div>
@@ -209,6 +211,8 @@
   <span>Fetching latest data…</span>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 <script src="dashboard.js"></script>
 <script>
 markActiveNav('overview');
@@ -269,11 +273,14 @@ function renderOverview(data) {
   countUp(document.getElementById('statRemaining'), Math.max(0, event.total_days - event.current_day));
 
   // ─── Engagement ring ───
-  const threeDaysAgo = new Date();
-  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+  // Use local-midnight boundaries so the "last 3 days" window is consistent
+  // regardless of the viewer's timezone (daily_breakdown dates are IST strings,
+  // parsed to local midnight here to avoid a UTC offset of up to a day).
+  const threeDaysAgo = daysAgoLocal(3);
   const recentDates = new Set();
   dailyBreakdown.forEach(r => {
-    if (new Date(r.date) >= threeDaysAgo) recentDates.add(r.name);
+    const d = new Date(r.date + 'T00:00:00');
+    if (d >= threeDaysAgo) recentDates.add(r.name);
   });
   // Fallback: if no daily_breakdown, use active_today
   const activeRecent = recentDates.size || summary.active_today;
@@ -318,22 +325,12 @@ function renderOverview(data) {
   const trendLabels = last7Dates.map(d => { const dt = new Date(d); return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }); });
   const trendData = last7Dates.map(d => dailyParticipants[d] ? dailyParticipants[d].size : 0);
 
-  if (trendChart) trendChart.destroy();
-  const trendCtx = document.getElementById('dailyTrendChart').getContext('2d');
-  trendChart = new Chart(trendCtx, {
-    type: 'bar',
-    data: {
-      labels: trendLabels,
-      datasets: [{
-        label: 'Participants',
-        data: trendData,
-        backgroundColor: 'rgba(16,185,129,0.7)',
-        borderColor: '#10B981',
-        borderWidth: 1,
-        borderRadius: 6,
-      }]
-    },
-    options: {
+  if (!trendChart) {
+    const trendCtx = document.getElementById('dailyTrendChart').getContext('2d');
+    trendChart = new Chart(trendCtx, {
+      type: 'bar',
+      data: { labels: [], datasets: [{ label: 'Participants', data: [], backgroundColor: 'rgba(16,185,129,0.7)', borderColor: '#10B981', borderWidth: 1, borderRadius: 6 }] },
+      options: {
       responsive: true,
       maintainAspectRatio: false,
       layout: { padding: { top: 24 } },
@@ -361,6 +358,12 @@ function renderOverview(data) {
       }
     }]
   });
+  }
+
+  // Update trend chart data (create or update)
+  trendChart.data.labels = trendLabels;
+  trendChart.data.datasets[0].data = trendData;
+  trendChart.update();
 
   // ─── Sport donut ───
   const sportCounts = {};
@@ -377,51 +380,58 @@ function renderOverview(data) {
   }
   const sportLabels = Object.keys(sportCounts).sort((a, b) => sportCounts[b] - sportCounts[a]);
   const sportData = sportLabels.map(s => sportCounts[s]);
-  const sportColors = ['#F97316', '#10B981', '#3B82F6', '#FBBF24', '#6B4FA0', '#C24B7C', '#047857', '#EA580C', '#2563EB', '#D97706'];
+  const sportColors = SPORT_COLORS; // shared palette from dashboard.js
 
-  if (donutChart) donutChart.destroy();
-  const donutCtx = document.getElementById('sportDonutChart').getContext('2d');
-  donutChart = new Chart(donutCtx, {
-    type: 'doughnut',
-    data: {
-      labels: sportLabels,
-      datasets: [{
-        data: sportData,
-        backgroundColor: sportColors.slice(0, sportLabels.length),
-        borderWidth: 2,
-        borderColor: '#FFFFFF'
+  if (!donutChart) {
+    const donutCtx = document.getElementById('sportDonutChart').getContext('2d');
+    donutChart = new Chart(donutCtx, {
+      type: 'doughnut',
+      data: {
+        labels: [],
+        datasets: [{
+          data: [],
+          backgroundColor: sportColors,
+          borderWidth: 2,
+          borderColor: '#FFFFFF'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12, font: { size: 12 } } },
+          tooltip: { callbacks: { label: ctx => ctx.label + ': ' + ctx.parsed + ' entries' } }
+        }
+      },
+      plugins: [{
+        id: 'donutLabels',
+        afterDatasetsDraw(chart) {
+          const ctx2 = chart.ctx;
+          const dataset = chart.getDatasetMeta(0);
+          dataset.data.forEach((arc, i) => {
+            const midAngle = (arc.startAngle + arc.endAngle) / 2;
+            const radius = (arc.innerRadius + arc.outerRadius) / 2;
+            const x = arc.x + Math.cos(midAngle) * radius;
+            const y = arc.y + Math.sin(midAngle) * radius;
+            const val = chart.data.datasets[0].data[i];
+            if (val > 0) {
+              ctx2.fillStyle = '#fff';
+              ctx2.font = 'bold 11px Manrope';
+              ctx2.textAlign = 'center';
+              ctx2.textBaseline = 'middle';
+              ctx2.fillText(val, x, y);
+            }
+          });
+        }
       }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { position: 'bottom', labels: { boxWidth: 12, padding: 12, font: { size: 12 } } },
-        tooltip: { callbacks: { label: ctx => ctx.label + ': ' + ctx.parsed + ' entries' } }
-      }
-    },
-    plugins: [{
-      id: 'donutLabels',
-      afterDatasetsDraw(chart) {
-        const ctx2 = chart.ctx;
-        const dataset = chart.getDatasetMeta(0);
-        dataset.data.forEach((arc, i) => {
-          const midAngle = (arc.startAngle + arc.endAngle) / 2;
-          const radius = (arc.innerRadius + arc.outerRadius) / 2;
-          const x = arc.x + Math.cos(midAngle) * radius;
-          const y = arc.y + Math.sin(midAngle) * radius;
-          const val = chart.data.datasets[0].data[i];
-          if (val > 0) {
-            ctx2.fillStyle = '#fff';
-            ctx2.font = 'bold 11px Manrope';
-            ctx2.textAlign = 'center';
-            ctx2.textBaseline = 'middle';
-            ctx2.fillText(val, x, y);
-          }
-        });
-      }
-    }]
-  });
+    });
+  }
+
+  // Update donut data (create or update)
+  donutChart.data.labels = sportLabels;
+  donutChart.data.datasets[0].data = sportData;
+  donutChart.data.datasets[0].backgroundColor = sportColors.slice(0, sportLabels.length);
+  donutChart.update();
 
   // ─── Shared team/date aggregation (used by this chart + Daily points below) ───
   const teamDailyPts = {}; // team -> { date -> points }
@@ -430,7 +440,6 @@ function renderOverview(data) {
     teamDailyPts[r.team][r.date] = (teamDailyPts[r.team][r.date] || 0) + r.points;
   });
   const allDates = [...new Set(dailyBreakdown.map(r => r.date))].sort();
-  const teamNames = Object.keys(teamDailyPts);
 
   // ─── Team sport mix (stacked bar: top-5 sports + Other + Bonus, per team) ───
   // Aggregate activity points per team per sport, and find the global top 5 sports.
@@ -494,60 +503,69 @@ function renderOverview(data) {
     borderColor: '#fff'
   });
 
-  if (raceChart) raceChart.destroy();
-  const sportMixCtx = document.getElementById('teamSportMixChart').getContext('2d');
-  raceChart = new Chart(sportMixCtx, {
-    type: 'bar',
-    data: { labels: mixTeamNames, datasets: sportMixDatasets },
-    options: {
-      indexAxis: 'y', // horizontal bars
-      responsive: true,
-      maintainAspectRatio: false,
-      layout: { padding: { right: 56 } }, // room for the total label at the end of each bar
-      plugins: {
-        legend: { position: 'bottom', onClick: isolateLegendOnClick, labels: { boxWidth: 12, padding: 12, font: { size: 12 } } },
-        tooltip: {
-          callbacks: {
-            label: ctx => `${ctx.dataset.label}: ${formatNumber(ctx.parsed.x)} pts`
+  if (!raceChart) {
+    const sportMixCtx = document.getElementById('teamSportMixChart').getContext('2d');
+    raceChart = new Chart(sportMixCtx, {
+      type: 'bar',
+      data: { labels: [], datasets: [] },
+      options: {
+        indexAxis: 'y', // horizontal bars
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { right: 56 } }, // room for the total label at the end of each bar
+        plugins: {
+          legend: { position: 'bottom', onClick: isolateLegendOnClick, labels: { boxWidth: 12, padding: 12, font: { size: 12 } } },
+          tooltip: {
+            callbacks: {
+              label: ctx => `${ctx.dataset.label}: ${formatNumber(ctx.parsed.x)} pts`
+            }
           }
+        },
+        scales: {
+          x: { stacked: true, beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { callback: v => formatNumber(v) } },
+          y: { stacked: true, grid: { display: false }, ticks: { font: { size: 12, weight: '600' } } }
         }
       },
-      scales: {
-        x: { stacked: true, beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { callback: v => formatNumber(v) } },
-        y: { stacked: true, grid: { display: false }, ticks: { font: { size: 12, weight: '600' } } }
-      }
-    },
-    plugins: [{
-      // Draws each team's grand total at the end of its stacked bar.
-      id: 'stackedBarTotals',
-      afterDatasetsDraw(chart) {
-        const ctx2 = chart.ctx;
-        const lastVisible = chart.data.datasets
-          .map((_, i) => i)
-          .filter(i => chart.isDatasetVisible(i));
-        if (!lastVisible.length) return;
-        const lastIdx = lastVisible[lastVisible.length - 1];
-        const lastMeta = chart.getDatasetMeta(lastIdx);
+      plugins: [{
+        // Draws each team's grand total at the end of its stacked bar.
+        id: 'stackedBarTotals',
+        afterDatasetsDraw(chart) {
+          const ctx2 = chart.ctx;
+          const lastVisible = chart.data.datasets
+            .map((_, i) => i)
+            .filter(i => chart.isDatasetVisible(i));
+          if (!lastVisible.length) return;
+          const lastIdx = lastVisible[lastVisible.length - 1];
+          const lastMeta = chart.getDatasetMeta(lastIdx);
 
-        lastMeta.data.forEach((bar, i) => {
-          // Sum only visible segments so the total matches what's drawn
-          let total = 0;
-          lastVisible.forEach(dsIdx => { total += chart.data.datasets[dsIdx].data[i] || 0; });
-          if (total <= 0) return;
-          ctx2.fillStyle = '#111827';
-          ctx2.font = 'bold 12px Manrope';
-          ctx2.textAlign = 'left';
-          ctx2.textBaseline = 'middle';
-          ctx2.fillText(formatNumber(total), bar.x + 8, bar.y);
-        });
-      }
-    }]
-  });
+          lastMeta.data.forEach((bar, i) => {
+            // Sum only visible segments so the total matches what's drawn
+            let total = 0;
+            lastVisible.forEach(dsIdx => { total += chart.data.datasets[dsIdx].data[i] || 0; });
+            if (total <= 0) return;
+            ctx2.fillStyle = '#111827';
+            ctx2.font = 'bold 12px Manrope';
+            ctx2.textAlign = 'left';
+            ctx2.textBaseline = 'middle';
+            ctx2.fillText(formatNumber(total), bar.x + 8, bar.y);
+          });
+        }
+      }]
+    });
+  }
+
+  // Update race chart data (create or update)
+  raceChart.data.labels = mixTeamNames;
+  raceChart.data.datasets = sportMixDatasets;
+  raceChart.update();
 
   // ─── Daily points by team (last 7 days, non-cumulative) ───
+  // Use mixTeamNames (same order as sport-mix chart & team preview) so teams
+  // with bonus points but no daily activity still appear, and placeholder
+  // teams are excluded consistently.
   const last7DatesPts = allDates.slice(-7);
-  const dailyPointsDatasets = teamNames.map((team, idx) => {
-    const dailyData = last7DatesPts.map(d => teamDailyPts[team][d] || 0);
+  const dailyPointsDatasets = mixTeamNames.map((team, idx) => {
+    const dailyData = last7DatesPts.map(d => (teamDailyPts[team] || {})[d] || 0);
     return {
       label: team,
       data: dailyData,
@@ -561,21 +579,27 @@ function renderOverview(data) {
 
   const dailyPointsLabels = last7DatesPts.map(d => { const dt = new Date(d); return dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }); });
 
-  if (dailyPointsChart) dailyPointsChart.destroy();
-  const dailyPointsCtx = document.getElementById('dailyPointsChart').getContext('2d');
-  dailyPointsChart = new Chart(dailyPointsCtx, {
-    type: 'line',
-    data: { labels: dailyPointsLabels, datasets: dailyPointsDatasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom', onClick: isolateLegendOnClick, labels: { boxWidth: 12, padding: 12, font: { size: 12 } } } },
-      scales: {
-        x: { grid: { display: false } },
-        y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }
+  if (!dailyPointsChart) {
+    const dailyPointsCtx = document.getElementById('dailyPointsChart').getContext('2d');
+    dailyPointsChart = new Chart(dailyPointsCtx, {
+      type: 'line',
+      data: { labels: [], datasets: [] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', onClick: isolateLegendOnClick, labels: { boxWidth: 12, padding: 12, font: { size: 12 } } } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } }
+        }
       }
-    }
-  });
+    });
+  }
+
+  // Update daily points chart data (create or update)
+  dailyPointsChart.data.labels = dailyPointsLabels;
+  dailyPointsChart.data.datasets = dailyPointsDatasets;
+  dailyPointsChart.update();
 
   // ─── Participation heatmap ───
   const heatmapWrap = document.getElementById('heatmapWrap');
@@ -586,12 +610,15 @@ function renderOverview(data) {
   });
   const maxParticipation = Math.max(...Object.values(peoplPerDay).map(s => s.size), 1);
   
-  // Generate all dates from start to today
+  // Generate all dates from start to today (local date to avoid UTC shift)
   const startD = new Date(event.start_date);
   const today = new Date();
   const heatDates = [];
-  for (let d = new Date(startD); d <= today; d.setDate(d.getDate() + 1)) {
-    heatDates.push(d.toISOString().slice(0, 10));
+  for (let d = new Date(startD.getFullYear(), startD.getMonth(), startD.getDate());
+       d <= today; d.setDate(d.getDate() + 1)) {
+    heatDates.push(d.getFullYear() + '-' +
+      String(d.getMonth() + 1).padStart(2, '0') + '-' +
+      String(d.getDate()).padStart(2, '0'));
   }
 
   heatmapWrap.innerHTML = '<div class="heatmap-grid">' + heatDates.map(d => {
@@ -599,8 +626,16 @@ function renderOverview(data) {
     const intensity = Math.round((count / maxParticipation) * 4);
     const dt = new Date(d);
     const label = dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-    return `<div class="heat-cell level-${intensity}" title="${label}: ${count} participants"></div>`;
+    return `<div class="heat-cell level-${intensity}" role="img" aria-label="${label}: ${count} participants" title="${label}: ${count} participants"></div>`;
   }).join('') + '</div>';
+
+  // Color-blind-friendly legend (text + swatches), so intensity isn't color-only.
+  heatmapWrap.insertAdjacentHTML('beforeend',
+    '<div class="heatmap-legend" aria-hidden="true">' +
+      '<span>Less</span>' +
+      [0, 1, 2, 3, 4].map(l => `<span class="heat-cell level-${l}"></span>`).join('') +
+      '<span>More</span>' +
+    '</div>');
 
   // ─── Motivational tagline ───
   const taglines = [
@@ -711,9 +746,10 @@ function renderOverview(data) {
   });
 
   // ─── Team preview cards ───
+  // Reuse mixTeams (already sorted by total_points, excludes placeholder teams)
+  // to keep team order consistent with the sport-mix chart.
   const teamPreview = document.getElementById('teamPreview');
-  const rankedTeams = [...teams].sort((a, b) => b.total_points - a.total_points);
-  teamPreview.innerHTML = rankedTeams.map(t => `
+  teamPreview.innerHTML = mixTeams.map(t => `
     <a class="team-card" href="teams.html" style="--team-color:${teamColor(t.name)}; text-decoration:none; color:inherit">
       <h3>${t.name}</h3>
       <div class="meta">${t.members} members</div>
@@ -726,8 +762,11 @@ fetchDashboard().then(renderOverview).catch(err => {
   document.getElementById('heroSub').textContent = 'Could not load dashboard data — ' + err.message;
 });
 
-// Increment page view counter (fire-and-forget, no impact on page load)
-fetch(WEBAPP_URL, { method: 'POST' }).catch(() => {});
+// Increment page view counter — fire after load settles so it doesn't
+// compete with the main data fetch for bandwidth.
+const fireViewCounter = () => fetch(WEBAPP_URL, { method: 'POST' }).catch(() => {});
+if ('requestIdleCallback' in window) requestIdleCallback(fireViewCounter, { timeout: 3000 });
+else setTimeout(fireViewCounter, 1500);
 
 window.addEventListener('dashboardFreshData', e => renderOverview(e.detail));
 
@@ -736,18 +775,16 @@ function renderTicker(data) {
   const dailyBreakdown = data.daily_breakdown || [];
 
   // Get today's date in IST (yyyy-MM-dd)
-  const now = new Date();
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  const istNow = new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + istOffset);
-  const todayStr = istNow.getFullYear() + '-' +
-    String(istNow.getMonth() + 1).padStart(2, '0') + '-' +
-    String(istNow.getDate()).padStart(2, '0');
+  const todayStr = todayIST();
 
   // Filter to today's entries only
   const todayEntries = dailyBreakdown.filter(r => r.date === todayStr);
 
   if (todayEntries.length === 0) {
-    tickerWrap.innerHTML = '<span class="ticker-empty">No activities updated for today till now</span>';
+    if (tickerWrap.dataset.state !== 'empty') {
+      tickerWrap.innerHTML = '<span class="ticker-empty">No activities updated for today till now</span>';
+      tickerWrap.dataset.state = 'empty';
+    }
     return;
   }
 
@@ -782,8 +819,13 @@ function renderTicker(data) {
     );
   });
 
+  // Skip rebuild if content is unchanged since last render (frequent on refresh).
+  const contentHtml = tickerItems.join('<span class="ticker-dot">●</span>');
+  if (tickerWrap.dataset.hash === contentHtml) return;
+  tickerWrap.dataset.hash = contentHtml;
+  tickerWrap.dataset.state = 'items';
+
   const separator = '<span class="ticker-dot">●</span>';
-  const contentHtml = tickerItems.join(separator);
 
   // Duplicate content for seamless infinite scroll
   const trackHtml = '<div class="ticker-track">' +

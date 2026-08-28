@@ -14,6 +14,11 @@ const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxrhD8vU7Y-9FEKj8a-N
 const DATA_URL = WEBAPP_URL || 'dashboard.json';
 const REDUCED_MOTION = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+// Number formatting locale — centralised so it's easy to reuse the dashboard
+// for a non-Indian audience later.
+const NUMBER_LOCALE = 'en-IN';
+const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 const TEAM_PALETTE = [
   { name: 'coral', hex: '#E2542F' },
   { name: 'turf',  hex: '#2F7A4F' },
@@ -22,6 +27,25 @@ const TEAM_PALETTE = [
   { name: 'purple',hex: '#6B4FA0' },
   { name: 'pink',  hex: '#C24B7C' },
 ];
+
+// Shared sport color palette — single source of truth for all charts.
+// First 5 map 1:1 to the stacked bar segments; remaining are for donut overflow.
+const SPORT_COLORS = [
+  '#F97316', // orange
+  '#10B981', // emerald
+  '#3B82F6', // blue
+  '#FBBF24', // amber
+  '#6B4FA0', // violet
+  '#C24B7C', // pink
+  '#047857', // green-700
+  '#EA580C', // orange-600
+  '#2563EB', // blue-600
+  '#D97706', // amber-600
+];
+
+const SPORT_MIX_COLORS = SPORT_COLORS.slice(0, 5); // exactly 5 for stacked bar top sports
+const OTHER_COLOR = '#9CA3AF';
+const BONUS_COLOR = '#111827';
 
 const TEAM_COLORS = {
   'Dark Knight':     '#FF6B6B',  // soft red
@@ -44,7 +68,7 @@ function teamColor(teamName) {
 }
 
 function formatNumber(n) {
-  return Math.round(n).toLocaleString('en-IN');
+  return Math.round(n).toLocaleString(NUMBER_LOCALE);
 }
 
 function timeAgo(iso) {
@@ -57,8 +81,43 @@ function timeAgo(iso) {
   return Math.round(diffHr / 24) + 'd ago';
 }
 
+// Returns today's date as "YYYY-MM-DD" in IST (UTC+5:30), independent of the
+// viewer's local timezone. Used to filter daily_breakdown by "today".
+function todayIST() {
+  const now = new Date();
+  const istMs = now.getTime() + (now.getTimezoneOffset() * 60000) + (5.5 * 60 * 60 * 1000);
+  const ist = new Date(istMs);
+  return ist.getFullYear() + '-' +
+    String(ist.getMonth() + 1).padStart(2, '0') + '-' +
+    String(ist.getDate()).padStart(2, '0');
+}
+
+// Returns "YYYY-MM-DD" for a Date, using LOCAL date components.
+// Avoids the UTC offset shift that toISOString().slice(0,10) causes.
+function localDateStr(d) {
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
+// Returns a Date object representing the current instant expressed in IST
+// (UTC+5:30). Used by countdowns that compare against IST-parsed dates.
+function nowIST() {
+  const now = new Date();
+  const istMs = now.getTime() + (now.getTimezoneOffset() * 60000) + (5.5 * 60 * 60 * 1000);
+  return new Date(istMs);
+}
+
+// Returns a Date set to local midnight N days ago, used for "last X days" windows.
+function daysAgoLocal(n) {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - n);
+  return d;
+}
+
 function countUp(el, target, opts = {}) {
-  const duration = REDUCED_MOTION ? 0 : (opts.duration || 1200);
+  const duration = prefersReducedMotion() ? 0 : (opts.duration || 1200);
   if (duration === 0) { el.textContent = formatNumber(target); return; }
   const start = performance.now();
   function tick(now) {

@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SRC 100 Day Challenge — Sports Breakdown</title>
 <link rel="stylesheet" href="style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
   .sport-row{
     background:var(--bg-card);border:1px solid var(--line);border-radius:var(--radius);
@@ -40,6 +43,7 @@
       <li><a href="sports.html" data-page="sports">Sports</a></li>
       <li><a href="challenges.html" data-page="challenges">Challenges</a></li>
     </ul>
+    <a class="log-cta" href="https://sundayrunclubchallenge-stack.github.io/Activity-logging/" target="_blank" rel="noopener">+ Log activity</a>
     <span class="sync-badge" id="syncBadge"></span>
   </div>
 </nav>
@@ -127,7 +131,7 @@ function setupSportFilter() {
         const to = new Date();
         const from = new Date();
         from.setDate(from.getDate() - days);
-        _sportDateRange = { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+        _sportDateRange = { from: localDateStr(from), to: localDateStr(to) };
       }
       renderSports(_fullData);
     });
