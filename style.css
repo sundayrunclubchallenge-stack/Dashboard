@@ -709,6 +709,30 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;font-
   white-space:nowrap;min-width:64px;text-align:right;
 }
 .wc-summary-empty{padding:16px;text-align:center;color:var(--ink-faint);font-size:13px}
+.wc-summary-count{font-family:var(--mono);font-size:12px;color:var(--turf-dark);font-weight:700;margin-bottom:10px}
 @media (max-width:520px){
   .wc-summary-metric{display:none}
 }
+
+/* ---------- Wild Card: dual-target honor roll (everyone who finished) ---------- */
+.wc-honor-roll{
+  margin:0 24px 8px;padding:16px 18px;border-radius:14px;
+  background:linear-gradient(135deg,#ECFDF5,#F0FDF4);border:1px solid #A7F3D0;
+}
+.wc-honor-head{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.wc-honor-icon{font-size:26px;flex-shrink:0}
+.wc-honor-title{font-weight:800;font-size:16px;color:var(--ink)}
+.wc-honor-sub{font-size:12px;color:var(--ink-soft);margin-top:1px}
+.wc-honor-chips{display:flex;flex-wrap:wrap;gap:8px}
+.wc-honor-chip{
+  display:inline-flex;align-items:center;gap:6px;padding:6px 10px;
+  background:#fff;border:1px solid #A7F3D0;border-radius:999px;font-size:13px;
+}
+.wc-honor-check{font-size:12px}
+.wc-honor-name{font-weight:700;color:var(--ink)}
+.wc-honor-team{font-size:11px;color:var(--ink-faint)}
+.wc-honor-via{
+  font-family:var(--mono);font-size:10px;font-weight:700;color:var(--turf-dark);
+  text-transform:uppercase;letter-spacing:0.5px;
+}
+.wc-honor-via:empty{display:none}

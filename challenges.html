@@ -103,6 +103,7 @@ function renderChallenges(data) {
 // Routes a full (live/upcoming) challenge card to the correct renderer by type.
 function renderChallengeCard(ch) {
   if (ch.type === 'team_distance_challenge') return renderTeamDistanceCard(ch);
+  if (ch.type === 'dual_target_distance') return renderDualTargetCard(ch);
   return renderStepChallengeCard(ch);
 }
 
@@ -386,10 +387,157 @@ function renderTeamDistanceCard(ch) {
   `;
 }
 
+// ── Wild Card #3 style: Dual-Target Distance (60km Run OR 72km Walk) ──
+// Individual, open to all. Complete EITHER target to earn a flat bonus.
+// Everyone who finishes wins — shown as an honor-roll strip (no podium).
+function renderDualTargetCard(ch) {
+  const now = nowIST();
+  const startD = new Date(ch.start_date + 'T00:00:00+05:30');
+  const endD = new Date(ch.end_date + 'T23:59:59+05:30');
+  const totalDays = Math.round((endD - startD) / 86400000) + 1;
+
+  const runTarget = ch.run_target_km || 60;
+  const walkTarget = ch.walk_target_km || 72;
+  const reward = ch.reward_points || 500;
+
+  // Status & countdown
+  let statusHtml = '';
+  let countdownHtml = '';
+  if (ch.status === 'upcoming') {
+    const daysUntil = Math.ceil((startD - now) / 86400000);
+    statusHtml = '<span class="wc-status wc-upcoming">Upcoming</span>';
+    countdownHtml = `<div class="wc-countdown">Starts in <strong>${daysUntil}</strong> day${daysUntil !== 1 ? 's' : ''}</div>`;
+  } else if (ch.status === 'active') {
+    const daysLeft = Math.max(0, Math.ceil((endD - now) / 86400000));
+    const daysPassed = Math.floor((now - startD) / 86400000) + 1;
+    statusHtml = '<span class="wc-status wc-active">Live Now</span>';
+    countdownHtml = `<div class="wc-countdown">Day <strong>${daysPassed}</strong> of ${totalDays} &mdash; <strong>${daysLeft}</strong> day${daysLeft !== 1 ? 's' : ''} left</div>`;
+  } else {
+    statusHtml = '<span class="wc-status wc-completed">Completed</span>';
+    countdownHtml = '';
+  }
+
+  const startLabel = new Date(ch.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  const endLabel = new Date(ch.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  // Rules
+  const rulesHtml = `
+    <div class="wc-rules">
+      <div class="wc-rule-item">
+        <span class="wc-rule-icon">🎯</span>
+        <div><strong>Objective</strong><br>Complete either <strong>${runTarget} km Running</strong> or <strong>${walkTarget} km Walking</strong> within the challenge week.</div>
+      </div>
+      <div class="wc-rule-item">
+        <span class="wc-rule-icon">📋</span>
+        <div><strong>Eligibility</strong><br>Open to all &mdash; every participant is welcome.</div>
+      </div>
+      <div class="wc-rule-item">
+        <span class="wc-rule-icon">📱</span>
+        <div><strong>Logging</strong><br>Log Running and Walking as usual (in km). Both count toward your own totals.</div>
+      </div>
+      <div class="wc-rule-item">
+        <span class="wc-rule-icon">🏆</span>
+        <div><strong>Rewards</strong><br>Flat <strong>${reward}</strong> Bonus Zing Points for <strong>everyone</strong> who completes either target.</div>
+      </div>
+    </div>
+  `;
+
+  const lb = ch.leaderboard || [];
+  const completers = lb.filter(p => p.completed);
+
+  // Honor-roll strip of everyone who completed (no gold/silver/bronze — flat reward)
+  let honorRollHtml = '';
+  if (completers.length > 0) {
+    honorRollHtml = `
+      <div class="wc-honor-roll">
+        <div class="wc-honor-head">
+          <span class="wc-honor-icon">🏅</span>
+          <div>
+            <div class="wc-honor-title">${completers.length} finisher${completers.length !== 1 ? 's' : ''} &mdash; +${reward} pts each</div>
+            <div class="wc-honor-sub">Hit either target and you're on the board.</div>
+          </div>
+        </div>
+        <div class="wc-honor-chips">
+          ${completers.map(p => `
+            <span class="wc-honor-chip">
+              <span class="wc-honor-check">✅</span>
+              <span class="wc-honor-name">${p.name}</span>
+              <span class="wc-honor-team">${p.team}</span>
+              <span class="wc-honor-via">${p.completed_via || ''}</span>
+            </span>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  } else if (ch.status === 'active') {
+    honorRollHtml = `
+      <div class="empty-state" style="padding:24px"><div class="big">No finishers yet</div>Be the first to hit ${runTarget} km running or ${walkTarget} km walking!</div>
+    `;
+  }
+
+  // Progress table (everyone with logged distance) — completers first
+  let progressHtml = '';
+  if (ch.status !== 'upcoming' && lb.length > 0) {
+    progressHtml = `
+      <div class="wc-lb-section">
+        <div class="section-head"><h2 style="font-size:18px">Progress</h2><span class="hint">${lb.length} participant${lb.length !== 1 ? 's' : ''} logging &bull; ${completers.length} completed</span></div>
+        <div class="panel" style="max-height:500px;overflow-y:auto">
+          <table class="member-table">
+            <thead><tr><th>Rank</th><th>Name</th><th>Team</th><th>Run (km)</th><th>Walk (km)</th><th>Status</th></tr></thead>
+            <tbody>
+              ${lb.map(p => `
+                <tr${p.completed ? ' style="font-weight:700"' : ''}>
+                  <td>${p.rank}</td>
+                  <td>${p.name}</td>
+                  <td>${p.team}</td>
+                  <td>${formatNumber(p.run_km)} / ${runTarget}</td>
+                  <td>${formatNumber(p.walk_km)} / ${walkTarget}</td>
+                  <td>${p.completed
+                    ? `<span style="color:var(--turf-dark)">✅ Completed (${p.completed_via})</span>`
+                    : `${p.progress_pct}%`}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  const note = `<div class="wc-eligible-note">Everyone who hits either target earns ${reward} bonus points &mdash; there's no limit on winners.</div>`;
+
+  return `
+    <div class="wc-card" id="challenge-${ch.id}">
+      <div class="wc-card-header">
+        <div class="wc-card-title-row">
+          <div>
+            <div class="wc-card-eyebrow">Wild Card Challenge #${ch.number}</div>
+            <h2 class="wc-card-title">${ch.name}</h2>
+            <div class="wc-card-subtitle">${ch.subtitle}</div>
+          </div>
+          <div class="wc-card-meta">
+            ${statusHtml}
+            <div class="wc-dates">${startLabel} — ${endLabel}</div>
+          </div>
+        </div>
+        ${countdownHtml}
+      </div>
+
+      ${rulesHtml}
+      ${honorRollHtml}
+      ${progressHtml}
+      ${note}
+    </div>
+  `;
+}
+
 // ── Compact summary for COMPLETED challenges (any type) ──
 // Shows name, number, dates, Completed status, and the top-3 winners
 // with place + points awarded + metric.
 function renderCompletedSummaryCard(ch) {
+  // Dual-target uses a flat "everyone who finished" model, not a top-3 podium.
+  if (ch.type === 'dual_target_distance') return renderDualTargetSummaryCard(ch);
+
   const startLabel = new Date(ch.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
   const endLabel = new Date(ch.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   const isTeam = ch.type === 'team_distance_challenge';
@@ -440,6 +588,46 @@ function renderCompletedSummaryCard(ch) {
           <div class="wc-dates" style="color:var(--ink-faint)">${startLabel} — ${endLabel}</div>
         </div>
       </div>
+      ${winnersHtml}
+    </div>
+  `;
+}
+
+// ── Compact summary for a COMPLETED dual-target challenge ──
+// Honor-roll of everyone who finished (flat reward), not a top-3 podium.
+function renderDualTargetSummaryCard(ch) {
+  const startLabel = new Date(ch.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  const endLabel = new Date(ch.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  const reward = ch.reward_points || 500;
+  const completers = (ch.leaderboard || []).filter(p => p.completed);
+
+  let winnersHtml;
+  if (completers.length === 0) {
+    winnersHtml = '<div class="wc-summary-empty">No finishers recorded.</div>';
+  } else {
+    winnersHtml = '<div class="wc-summary-winners">' + completers.map(w => `
+        <div class="wc-summary-row">
+          <span class="wc-summary-medal">✅</span>
+          <span class="wc-summary-name">${w.name}<span class="wc-summary-team">${w.team}</span></span>
+          <span class="wc-summary-metric">${w.completed_via || ''}</span>
+          <span class="wc-summary-pts">+${reward} pts</span>
+        </div>
+      `).join('') + '</div>';
+  }
+
+  return `
+    <div class="wc-card wc-card-compact" id="challenge-${ch.id}">
+      <div class="wc-summary-head">
+        <div>
+          <div class="wc-card-eyebrow" style="color:var(--ink-faint)">Wild Card Challenge #${ch.number}</div>
+          <h3 class="wc-summary-title">${ch.name}</h3>
+        </div>
+        <div class="wc-card-meta" style="text-align:right">
+          <span class="wc-status wc-completed">Completed</span>
+          <div class="wc-dates" style="color:var(--ink-faint)">${startLabel} — ${endLabel}</div>
+        </div>
+      </div>
+      <div class="wc-summary-count">${completers.length} finisher${completers.length !== 1 ? 's' : ''} · +${reward} pts each</div>
       ${winnersHtml}
     </div>
   `;
