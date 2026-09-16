@@ -8,6 +8,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  /* Sortable leaderboard headers */
+  .member-table th.sortable{cursor:pointer;user-select:none;white-space:nowrap;transition:color .15s}
+  .member-table th.sortable:hover{color:var(--ink)}
+  .member-table th.sortable .sort-caret{opacity:.35;font-size:10px;margin-left:4px}
+  .member-table th.sortable[data-dir="asc"],
+  .member-table th.sortable[data-dir="desc"]{color:var(--coral)}
+  .member-table th.sortable[data-dir="asc"] .sort-caret,
+  .member-table th.sortable[data-dir="desc"] .sort-caret{opacity:1;color:var(--coral)}
+</style>
 </head>
 <body>
 
@@ -98,6 +108,84 @@ function renderChallenges(data) {
     completed.map(ch => renderCompletedSummaryCard(ch)).join('');
 
   container.innerHTML = html;
+
+  // Wire up sortable leaderboard tables and re-apply any saved sort state.
+  // Runs after every render (including background refreshes) so sorting persists.
+  initSortableTables(container);
+}
+
+// ── Column sorting for leaderboard tables ────────────────────
+// Sort state is kept per table id so it survives re-renders (e.g. the
+// 5-minute background data refresh, which rebuilds innerHTML).
+const _sortState = {}; // tableId -> { col: <index>, dir: 'asc'|'desc' }
+
+// Parses a cell for comparison. Numeric columns (data-sort="num") strip
+// everything except digits, sign and decimal point; others compare as text.
+function sortCellValue(cell, type) {
+  const raw = (cell.getAttribute('data-sort-value') ?? cell.textContent).trim();
+  if (type === 'num') {
+    const n = parseFloat(raw.replace(/[^0-9.\-]/g, ''));
+    return isNaN(n) ? -Infinity : n;
+  }
+  return raw.toLowerCase();
+}
+
+function applySort(table, col, dir) {
+  const tbody = table.querySelector('tbody');
+  if (!tbody) return;
+  const headers = table.querySelectorAll('thead th');
+  const type = headers[col] ? (headers[col].getAttribute('data-sort') || 'text') : 'text';
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+
+  rows.sort((a, b) => {
+    const av = sortCellValue(a.cells[col], type);
+    const bv = sortCellValue(b.cells[col], type);
+    let cmp;
+    if (type === 'num') cmp = av - bv;
+    else cmp = av < bv ? -1 : av > bv ? 1 : 0;
+    return dir === 'asc' ? cmp : -cmp;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+
+  // Update header carets
+  headers.forEach((th, i) => {
+    if (!th.classList.contains('sortable')) return;
+    const caret = th.querySelector('.sort-caret');
+    if (i === col) {
+      th.setAttribute('data-dir', dir);
+      if (caret) caret.textContent = dir === 'asc' ? '▲' : '▼';
+    } else {
+      th.removeAttribute('data-dir');
+      if (caret) caret.textContent = '⇅';
+    }
+  });
+}
+
+function initSortableTables(container) {
+  container.querySelectorAll('table.member-table[data-sortable-id]').forEach(table => {
+    const id = table.getAttribute('data-sortable-id');
+
+    // Attach caret spans + click handlers once per table element.
+    table.querySelectorAll('thead th.sortable').forEach((th, i) => {
+      if (!th.querySelector('.sort-caret')) {
+        const c = document.createElement('span');
+        c.className = 'sort-caret';
+        c.textContent = '⇅';
+        th.appendChild(c);
+      }
+      th.onclick = () => {
+        const cur = _sortState[id];
+        let dir = 'desc';
+        if (cur && cur.col === i) dir = cur.dir === 'desc' ? 'asc' : 'desc';
+        _sortState[id] = { col: i, dir };
+        applySort(table, i, dir);
+      };
+    });
+
+    // Re-apply saved sort after a re-render.
+    const saved = _sortState[id];
+    if (saved) applySort(table, saved.col, saved.dir);
+  });
 }
 
 // Routes a full (live/upcoming) challenge card to the correct renderer by type.
@@ -190,15 +278,15 @@ function renderStepChallengeCard(ch) {
       <div class="wc-lb-section">
         <div class="section-head"><h2 style="font-size:18px">Leaderboard</h2><span class="hint">${ch.eligible_count} eligible participants</span></div>
         <div class="panel" style="max-height:500px;overflow-y:auto">
-          <table class="member-table">
-            <thead><tr><th>Rank</th><th>Name</th><th>Team</th><th>Total ${ch.metric_label}</th><th>Days Logged</th></tr></thead>
+          <table class="member-table" data-sortable-id="step-${ch.id}">
+            <thead><tr><th class="sortable" data-sort="num">Rank</th><th class="sortable" data-sort="text">Name</th><th class="sortable" data-sort="text">Team</th><th class="sortable" data-sort="num">Total ${ch.metric_label}</th><th class="sortable" data-sort="num">Days Logged</th></tr></thead>
             <tbody>
               ${activeLb.map(p => `
                 <tr${p.rank <= 3 ? ' style="font-weight:700"' : ''}>
-                  <td>${p.rank <= 3 ? ['🥇','🥈','🥉'][p.rank-1] : p.rank}</td>
+                  <td data-sort-value="${p.rank}">${p.rank <= 3 ? ['🥇','🥈','🥉'][p.rank-1] : p.rank}</td>
                   <td>${p.name}</td>
                   <td>${p.team}</td>
-                  <td>${formatNumber(p.total_metric)}</td>
+                  <td data-sort-value="${p.total_metric}">${formatNumber(p.total_metric)}</td>
                   <td>${new Set(p.daily_log.map(d => d.date)).size}</td>
                 </tr>
               `).join('')}
@@ -253,7 +341,11 @@ function renderTeamDistanceCard(ch) {
   const now = nowIST();
   const startD = new Date(ch.start_date + 'T00:00:00+05:30');
   const endD = new Date(ch.end_date + 'T23:59:59+05:30');
-  const totalDays = Math.round((endD - startD) / 86400000) + 1;
+  // Span in days is calculated from date-only midnights so the end-of-day time
+  // on endD (23:59:59) doesn't inflate the rounding (e.g. Mon–Sun = 7, not 8).
+  const startMid = new Date(ch.start_date + 'T00:00:00+05:30');
+  const endMid = new Date(ch.end_date + 'T00:00:00+05:30');
+  const totalDays = Math.round((endMid - startMid) / 86400000) + 1;
 
   // Status & countdown
   let statusHtml = '';
@@ -331,17 +423,17 @@ function renderTeamDistanceCard(ch) {
       <div class="wc-lb-section">
         <div class="section-head"><h2 style="font-size:18px">Team standings</h2><span class="hint">${lb.length} teams · ranked by % improvement</span></div>
         <div class="panel" style="max-height:500px;overflow-y:auto">
-          <table class="member-table">
-            <thead><tr><th>Rank</th><th>Team</th><th>Baseline km/wk</th><th>Week 6 km</th><th>Improvement</th><th>Award</th></tr></thead>
+          <table class="member-table" data-sortable-id="teamdist-${ch.id}">
+            <thead><tr><th class="sortable" data-sort="num">Rank</th><th class="sortable" data-sort="text">Team</th><th class="sortable" data-sort="num">Baseline km/wk</th><th class="sortable" data-sort="num">Week 6 km</th><th class="sortable" data-sort="num">Improvement</th><th class="sortable" data-sort="num">Award</th></tr></thead>
             <tbody>
               ${lb.map(t => `
                 <tr${t.rank <= 3 ? ' style="font-weight:700"' : ''}>
-                  <td>${t.rank <= 3 ? ['🥇','🥈','🥉'][t.rank-1] : t.rank}</td>
+                  <td data-sort-value="${t.rank}">${t.rank <= 3 ? ['🥇','🥈','🥉'][t.rank-1] : t.rank}</td>
                   <td>${t.team}</td>
-                  <td>${formatNumber(t.baseline_km)}</td>
-                  <td>${formatNumber(t.week6_km)}</td>
-                  <td style="color:${t.improvement_pct >= 0 ? 'var(--turf-dark)' : '#991B1B'}">${formatPct(t.improvement_pct)}</td>
-                  <td>${t.award_points > 0 ? '+' + t.award_points + ' pts' : '—'}</td>
+                  <td data-sort-value="${t.baseline_km}">${formatNumber(t.baseline_km)}</td>
+                  <td data-sort-value="${t.week6_km}">${formatNumber(t.week6_km)}</td>
+                  <td data-sort-value="${t.improvement_pct}" style="color:${t.improvement_pct >= 0 ? 'var(--turf-dark)' : '#991B1B'}">${formatPct(t.improvement_pct)}</td>
+                  <td data-sort-value="${t.award_points || 0}">${t.award_points > 0 ? '+' + t.award_points + ' pts' : '—'}</td>
                 </tr>
               `).join('')}
             </tbody>
@@ -394,7 +486,11 @@ function renderDualTargetCard(ch) {
   const now = nowIST();
   const startD = new Date(ch.start_date + 'T00:00:00+05:30');
   const endD = new Date(ch.end_date + 'T23:59:59+05:30');
-  const totalDays = Math.round((endD - startD) / 86400000) + 1;
+  // Span in days is calculated from date-only midnights so the end-of-day time
+  // on endD (23:59:59) doesn't inflate the rounding (e.g. Mon–Sun = 7, not 8).
+  const startMid = new Date(ch.start_date + 'T00:00:00+05:30');
+  const endMid = new Date(ch.end_date + 'T00:00:00+05:30');
+  const totalDays = Math.round((endMid - startMid) / 86400000) + 1;
 
   const runTarget = ch.run_target_km || 60;
   const walkTarget = ch.walk_target_km || 72;
@@ -482,17 +578,17 @@ function renderDualTargetCard(ch) {
       <div class="wc-lb-section">
         <div class="section-head"><h2 style="font-size:18px">Progress</h2><span class="hint">${lb.length} participant${lb.length !== 1 ? 's' : ''} logging &bull; ${completers.length} completed</span></div>
         <div class="panel" style="max-height:500px;overflow-y:auto">
-          <table class="member-table">
-            <thead><tr><th>Rank</th><th>Name</th><th>Team</th><th>Run (km)</th><th>Walk (km)</th><th>Status</th></tr></thead>
+          <table class="member-table" data-sortable-id="dual-${ch.id}">
+            <thead><tr><th class="sortable" data-sort="num">Rank</th><th class="sortable" data-sort="text">Name</th><th class="sortable" data-sort="text">Team</th><th class="sortable" data-sort="num">Run (km)</th><th class="sortable" data-sort="num">Walk (km)</th><th class="sortable" data-sort="num">Status</th></tr></thead>
             <tbody>
               ${lb.map(p => `
                 <tr${p.completed ? ' style="font-weight:700"' : ''}>
-                  <td>${p.rank}</td>
+                  <td data-sort-value="${p.rank}">${p.rank}</td>
                   <td>${p.name}</td>
                   <td>${p.team}</td>
-                  <td>${formatNumber(p.run_km)} / ${runTarget}</td>
-                  <td>${formatNumber(p.walk_km)} / ${walkTarget}</td>
-                  <td>${p.completed
+                  <td data-sort-value="${p.run_km}">${formatNumber(p.run_km)} / ${runTarget}</td>
+                  <td data-sort-value="${p.walk_km}">${formatNumber(p.walk_km)} / ${walkTarget}</td>
+                  <td data-sort-value="${p.completed ? 1000 + (p.progress_pct || 0) : (p.progress_pct || 0)}">${p.completed
                     ? `<span style="color:var(--turf-dark)">✅ Completed (${p.completed_via})</span>`
                     : `${p.progress_pct}%`}</td>
                 </tr>
