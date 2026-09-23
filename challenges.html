@@ -192,6 +192,7 @@ function initSortableTables(container) {
 function renderChallengeCard(ch) {
   if (ch.type === 'team_distance_challenge') return renderTeamDistanceCard(ch);
   if (ch.type === 'dual_target_distance') return renderDualTargetCard(ch);
+  if (ch.type === 'rank_improvement') return renderRankImprovementCard(ch);
   return renderStepChallengeCard(ch);
 }
 
@@ -633,6 +634,8 @@ function renderDualTargetCard(ch) {
 function renderCompletedSummaryCard(ch) {
   // Dual-target uses a flat "everyone who finished" model, not a top-3 podium.
   if (ch.type === 'dual_target_distance') return renderDualTargetSummaryCard(ch);
+  // Rank improvement uses a climbers honor board with a top-3 movers podium.
+  if (ch.type === 'rank_improvement') return renderRankImprovementSummaryCard(ch);
 
   const startLabel = new Date(ch.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
   const endLabel = new Date(ch.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -724,6 +727,207 @@ function renderDualTargetSummaryCard(ch) {
         </div>
       </div>
       <div class="wc-summary-count">${completers.length} finisher${completers.length !== 1 ? 's' : ''} · +${reward} pts each</div>
+      ${winnersHtml}
+    </div>
+  `;
+}
+
+// ── Wild Card #4 style: Rank Improvement ("Movers & Shakers") ──
+// Individual, open to all. Climb the leaderboard vs a rank frozen at the start.
+// Only climbers are shown. Points follow an escalating curve, capped at max.
+// While active, ranks/points are a LIVE preview; only the final rank is awarded.
+function renderRankImprovementCard(ch) {
+  const now = nowIST();
+  const startD = new Date(ch.start_date + 'T00:00:00+05:30');
+  const endD = new Date(ch.end_date + 'T23:59:59+05:30');
+  const startMid = new Date(ch.start_date + 'T00:00:00+05:30');
+  const endMid = new Date(ch.end_date + 'T00:00:00+05:30');
+  const totalDays = Math.round((endMid - startMid) / 86400000) + 1;
+
+  let statusHtml = '';
+  let countdownHtml = '';
+  if (ch.status === 'upcoming') {
+    const daysUntil = Math.ceil((startD - now) / 86400000);
+    statusHtml = '<span class="wc-status wc-upcoming">Upcoming</span>';
+    countdownHtml = `<div class="wc-countdown">Starts in <strong>${daysUntil}</strong> day${daysUntil !== 1 ? 's' : ''}</div>`;
+  } else if (ch.status === 'active') {
+    const daysLeft = Math.max(0, Math.ceil((endD - now) / 86400000));
+    const daysPassed = Math.floor((now - startD) / 86400000) + 1;
+    statusHtml = '<span class="wc-status wc-active">Live Now</span>';
+    countdownHtml = `<div class="wc-countdown">Day <strong>${daysPassed}</strong> of ${totalDays} &mdash; <strong>${daysLeft}</strong> day${daysLeft !== 1 ? 's' : ''} left</div>`;
+  } else {
+    statusHtml = '<span class="wc-status wc-completed">Completed</span>';
+    countdownHtml = '';
+  }
+
+  const startLabel = new Date(ch.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  const endLabel = new Date(ch.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+
+  // Rewards summary from the escalating curve. The last tier is the capped
+  // "N or more" step, so show it with a "+" (e.g. "4+ up = 500").
+  const curve = ch.reward_curve || [];
+  const rewardStr = curve.map((s, i) => {
+    const isLast = i === curve.length - 1;
+    return `${s.ranks_up}${isLast ? '+' : ''} up = <strong>${s.points}</strong>`;
+  }).join(' &bull; ');
+
+  const rulesHtml = `
+    <div class="wc-rules">
+      <div class="wc-rule-item">
+        <span class="wc-rule-icon">🎯</span>
+        <div><strong>Objective</strong><br>Climb the SRC leaderboard. Bonus is based on how many ranks you rise between the start and end of the week.</div>
+      </div>
+      <div class="wc-rule-item">
+        <span class="wc-rule-icon">📊</span>
+        <div><strong>How it works</strong><br>Base Rank is frozen at 00:00 on ${startLabel}. Rank Improvement = Base Rank − Final Rank.</div>
+      </div>
+      <div class="wc-rule-item">
+        <span class="wc-rule-icon">🏆</span>
+        <div><strong>Rewards (Bonus Zing Points)</strong><br>${rewardStr} &bull; max <strong>${ch.max_points}</strong>.</div>
+      </div>
+      <div class="wc-rule-item">
+        <span class="wc-rule-icon">⚠️</span>
+        <div><strong>No movement, no bonus</strong><br>Staying the same or dropping earns nothing. Only upward movement counts.</div>
+      </div>
+    </div>
+  `;
+
+  const lb = ch.leaderboard || [];
+
+  // If the base rank isn't frozen yet (e.g. upcoming / snapshot not taken).
+  if (!ch.baseline_frozen) {
+    const note = `<div class="wc-eligible-note">Base ranks will be locked in at 00:00 on ${startLabel}. Climbers will appear here once the challenge starts.</div>`;
+    return `
+      <div class="wc-card" id="challenge-${ch.id}">
+        <div class="wc-card-header">
+          <div class="wc-card-title-row">
+            <div>
+              <div class="wc-card-eyebrow">Wild Card Challenge #${ch.number}</div>
+              <h2 class="wc-card-title">${ch.name}</h2>
+              <div class="wc-card-subtitle">${ch.subtitle}</div>
+            </div>
+            <div class="wc-card-meta">${statusHtml}<div class="wc-dates">${startLabel} — ${endLabel}</div></div>
+          </div>
+          ${countdownHtml}
+        </div>
+        ${rulesHtml}
+        ${note}
+      </div>
+    `;
+  }
+
+  // Top 3 movers podium (by ranks gained).
+  let podiumHtml = '';
+  const top3 = lb.slice(0, 3);
+  if (top3.length > 0) {
+    const medals = ['wc-gold', 'wc-silver', 'wc-bronze'];
+    const icons = ['👑', '🥈', '🥉'];
+    podiumHtml = '<div class="wc-podium">' + top3.map((p, i) => `
+      <div class="wc-podium-card ${medals[i]}">
+        <div class="wc-podium-rank">${icons[i]}</div>
+        <div class="wc-podium-name">${p.name}</div>
+        <div class="wc-podium-team">${p.team}</div>
+        <div class="wc-podium-metric">▲ ${p.ranks_up} rank${p.ranks_up !== 1 ? 's' : ''} · +${p.award_points} pts</div>
+      </div>
+    `).join('') + '</div>';
+  }
+
+  // Full climbers table.
+  let boardHtml = '';
+  const liveNote = ch.status === 'active'
+    ? '<span class="hint">Live standings — provisional. Final bonus locks in at end of ' + endLabel + '.</span>'
+    : '<span class="hint">' + lb.length + ' climber' + (lb.length !== 1 ? 's' : '') + '</span>';
+  if (lb.length > 0) {
+    boardHtml = `
+      <div class="wc-lb-section">
+        <div class="section-head"><h2 style="font-size:18px">Climbers</h2>${liveNote}</div>
+        <div class="panel" style="max-height:500px;overflow-y:auto">
+          <table class="member-table" data-sortable-id="movers-${ch.id}">
+            <thead><tr><th class="sortable" data-sort="num">Mover</th><th class="sortable" data-sort="text">Name</th><th class="sortable" data-sort="text">Team</th><th class="sortable" data-sort="num">Base Rank</th><th class="sortable" data-sort="num">${ch.status === 'completed' ? 'Final' : 'Current'} Rank</th><th class="sortable" data-sort="num">Ranks Up</th><th class="sortable" data-sort="num">${ch.status === 'completed' ? 'Bonus' : 'Projected'}</th></tr></thead>
+            <tbody>
+              ${lb.map(p => `
+                <tr${p.rank <= 3 ? ' style="font-weight:700"' : ''}>
+                  <td data-sort-value="${p.rank}">${p.rank <= 3 ? ['🥇','🥈','🥉'][p.rank-1] : p.rank}</td>
+                  <td>${p.name}</td>
+                  <td>${p.team}</td>
+                  <td data-sort-value="${p.base_rank}">#${p.base_rank}</td>
+                  <td data-sort-value="${p.current_rank}">#${p.current_rank}</td>
+                  <td data-sort-value="${p.ranks_up}" style="color:var(--turf-dark)">▲ ${p.ranks_up}</td>
+                  <td data-sort-value="${p.award_points}">+${p.award_points} pts</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } else if (ch.status === 'active') {
+    boardHtml = `
+      <div class="wc-lb-section">
+        <div class="section-head"><h2 style="font-size:18px">Climbers</h2></div>
+        <div class="empty-state" style="padding:24px"><div class="big">No climbers yet</div>Move up from your starting rank to appear here!</div>
+      </div>
+    `;
+  }
+
+  const note = `<div class="wc-eligible-note">Standings update live as points change. Only your rank at the end of ${endLabel} decides the final bonus.</div>`;
+
+  return `
+    <div class="wc-card" id="challenge-${ch.id}">
+      <div class="wc-card-header">
+        <div class="wc-card-title-row">
+          <div>
+            <div class="wc-card-eyebrow">Wild Card Challenge #${ch.number}</div>
+            <h2 class="wc-card-title">${ch.name}</h2>
+            <div class="wc-card-subtitle">${ch.subtitle}</div>
+          </div>
+          <div class="wc-card-meta">${statusHtml}<div class="wc-dates">${startLabel} — ${endLabel}</div></div>
+        </div>
+        ${countdownHtml}
+      </div>
+      ${rulesHtml}
+      ${podiumHtml}
+      ${boardHtml}
+      ${note}
+    </div>
+  `;
+}
+
+// ── Compact summary for a COMPLETED rank-improvement challenge ──
+// Honor board of everyone who climbed, with a top-3 movers podium feel.
+function renderRankImprovementSummaryCard(ch) {
+  const startLabel = new Date(ch.start_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  const endLabel = new Date(ch.end_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  const climbers = ch.leaderboard || [];
+
+  let winnersHtml;
+  if (climbers.length === 0) {
+    winnersHtml = '<div class="wc-summary-empty">No climbers recorded.</div>';
+  } else {
+    const medals = ['🥇', '🥈', '🥉'];
+    winnersHtml = '<div class="wc-summary-winners">' + climbers.map((w, i) => `
+        <div class="wc-summary-row">
+          <span class="wc-summary-medal">${i < 3 ? medals[i] : '▲'}</span>
+          <span class="wc-summary-name">${w.name}<span class="wc-summary-team">${w.team}</span></span>
+          <span class="wc-summary-metric">▲ ${w.ranks_up} rank${w.ranks_up !== 1 ? 's' : ''} (#${w.base_rank} → #${w.current_rank})</span>
+          <span class="wc-summary-pts">+${w.award_points} pts</span>
+        </div>
+      `).join('') + '</div>';
+  }
+
+  return `
+    <div class="wc-card wc-card-compact" id="challenge-${ch.id}">
+      <div class="wc-summary-head">
+        <div>
+          <div class="wc-card-eyebrow" style="color:var(--ink-faint)">Wild Card Challenge #${ch.number}</div>
+          <h3 class="wc-summary-title">${ch.name}</h3>
+        </div>
+        <div class="wc-card-meta" style="text-align:right">
+          <span class="wc-status wc-completed">Completed</span>
+          <div class="wc-dates" style="color:var(--ink-faint)">${startLabel} — ${endLabel}</div>
+        </div>
+      </div>
+      <div class="wc-summary-count">${climbers.length} climber${climbers.length !== 1 ? 's' : ''} earned a bonus</div>
       ${winnersHtml}
     </div>
   `;
