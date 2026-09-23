@@ -17,6 +17,15 @@
   .member-table th.sortable[data-dir="desc"]{color:var(--coral)}
   .member-table th.sortable[data-dir="asc"] .sort-caret,
   .member-table th.sortable[data-dir="desc"] .sort-caret{opacity:1;color:var(--coral)}
+
+  /* Movers & Shakers — reward chips (wrap neatly in the narrow rule box) */
+  .mv-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .mv-chip{display:inline-flex;align-items:center;gap:6px;background:#faf5ff;
+    border:1px solid #e9d5ff;border-radius:999px;padding:3px 10px;font-size:12px;
+    line-height:1.4;white-space:nowrap}
+  .mv-chip-k{color:#6b21a8;font-weight:600}
+  .mv-chip-v{color:#fff;background:#9333ea;border-radius:999px;padding:1px 8px;font-weight:700}
+  .mv-max{margin-top:8px;font-size:12px;color:var(--ink-faint)}
 </style>
 </head>
 <body>
@@ -768,8 +777,9 @@ function renderRankImprovementCard(ch) {
   const curve = ch.reward_curve || [];
   const rewardStr = curve.map((s, i) => {
     const isLast = i === curve.length - 1;
-    return `${s.ranks_up}${isLast ? '+' : ''} up = <strong>${s.points}</strong>`;
-  }).join(' &bull; ');
+    const label = `${s.ranks_up}${isLast ? '+' : ''} rank${(s.ranks_up === 1 && !isLast) ? '' : 's'} up`;
+    return `<span class="mv-chip"><span class="mv-chip-k">${label}</span><span class="mv-chip-v">+${s.points}</span></span>`;
+  }).join('');
 
   const rulesHtml = `
     <div class="wc-rules">
@@ -779,11 +789,20 @@ function renderRankImprovementCard(ch) {
       </div>
       <div class="wc-rule-item">
         <span class="wc-rule-icon">📊</span>
-        <div><strong>How it works</strong><br>Base Rank is frozen at 00:00 on ${startLabel}. Rank Improvement = Base Rank − Final Rank.</div>
+        <div><strong>How it works</strong><br>
+          Your <strong>Base Rank</strong> is locked at 00:00 on ${startLabel}.
+          Your <strong>Final Rank</strong> is taken at the end of ${endLabel} (23:59).
+          Bonus is based on how far you climb: <strong>Ranks Up = Base Rank − Final Rank</strong>.
+          During the week the "Current Rank" shown here is a live preview — it rises and falls with your points, and only your rank at the very end counts.
+        </div>
       </div>
       <div class="wc-rule-item">
         <span class="wc-rule-icon">🏆</span>
-        <div><strong>Rewards (Bonus Zing Points)</strong><br>${rewardStr} &bull; max <strong>${ch.max_points}</strong>.</div>
+        <div>
+          <strong>Rewards (Bonus Zing Points)</strong>
+          <div class="mv-chips">${rewardStr}</div>
+          <div class="mv-max">Maximum <strong>${ch.max_points}</strong> points.</div>
+        </div>
       </div>
       <div class="wc-rule-item">
         <span class="wc-rule-icon">⚠️</span>

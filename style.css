@@ -651,10 +651,10 @@ footer .wrap{display:flex;justify-content:space-between;align-items:center;font-
 /* Rules */
 .wc-rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;padding:24px}
 .wc-rule-item{
-  display:flex;gap:12px;padding:14px;background:var(--bg-alt);border-radius:10px;
+  display:flex;align-items:flex-start;gap:12px;padding:14px;background:var(--bg-alt);border-radius:10px;
   font-size:13px;line-height:1.5;color:var(--ink-soft);
 }
-.wc-rule-icon{font-size:22px;flex-shrink:0;margin-top:2px}
+.wc-rule-icon{font-size:22px;line-height:1.35;flex-shrink:0;margin-top:0}
 .wc-rule-item strong{color:var(--ink);display:block;margin-bottom:2px}
 
 /* Podium */
